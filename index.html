@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>拼豆店 · 工位看板</title>
+<meta name="app-ver" content="v0.2.0">
 <style>
 :root{
   --bg:#f4efe6; --bg2:#fbf8f2; --card:#ffffff; --ink:#241f1a; --ink2:#4b4239; --muted:#7c7064;
@@ -105,6 +106,18 @@ aside{display:flex;flex-direction:column;gap:12px;position:sticky;top:78px}
 .empty{font-size:11.5px;color:var(--muted);padding:6px 0}
 .panel-note{font-size:10.5px;color:var(--muted);padding:8px 13px;background:#fdfaf5;border-top:1px solid var(--line2);line-height:1.5}
 
+.ver{font-family:var(--mono);font-size:10.5px;font-weight:750;color:var(--muted);background:#fff;border:1px solid var(--line);border-radius:8px;padding:5px 8px}
+.ver:hover{color:var(--ink);border-color:#cfc3b1}
+.update{position:sticky;top:64px;z-index:70;display:none;align-items:center;gap:9px;justify-content:center;
+  background:#fff4d6;border-bottom:1px solid #ecd9a0;padding:8px 14px;font-size:12px;color:#6b4b08}
+.update.on{display:flex}
+.update b{font-family:var(--mono)}
+.chlog{display:flex;flex-direction:column;gap:10px;max-height:56vh;overflow:auto}
+.chver{border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:#fdfbf7}
+.chver .ch{display:flex;justify-content:space-between;gap:8px;font-size:12px;font-weight:800}
+.chver .ch span{font-family:var(--mono);font-size:10.5px;color:var(--muted);font-weight:600}
+.chver ul{margin:6px 0 0;padding-left:16px;font-size:11.5px;color:var(--ink2);line-height:1.65}
+
 /* modal */
 .modal{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(35,28,22,.5);backdrop-filter:blur(3px)}
 .modal.on{display:flex}
@@ -145,15 +158,22 @@ aside{display:flex;flex-direction:column;gap:12px;position:sticky;top:78px}
   <div class="wrap top-in">
     <div class="brand">
       <span class="beads"><i></i><i></i><i></i><i></i></span>
-      <div>拼豆店 <small id="shopName">Hurstville · 工位看板</small></div>
+      <div>拼豆店 <small id="shopName">Zetland · 工位看板</small></div>
     </div>
     <div class="meta"><span id="dateTxt">—</span><span id="clockTxt">--:--:--</span></div>
     <div class="actions">
       <span class="sync" id="syncBadge">本地</span>
+      <button class="ver" id="verBtn" title="更新日志">v0.2.0</button>
       <button class="btn sm" id="settingsBtn">⚙ 设置</button>
     </div>
   </div>
 </header>
+
+<div class="update" id="updateBar">
+  <span>🔄 新版本 <b id="upVer"></b> 已发布</span>
+  <button class="btn sm acc" id="upBtn">立即刷新</button>
+  <button class="btn sm ghost" id="upLater">稍后</button>
+</div>
 
 <main class="wrap">
   <section class="summary">
@@ -212,8 +232,25 @@ const TYPE = {smart:"智能板", normal:"普通板"};
 const BILL = {hourly:"按小时", package:"2 小时套餐"};
 
 /* Firebase：新表放在同一个 RTDB 的 shops/<新 key> 下，和天胡门店数据隔离 */
-/* Firebase：新表 = 同一个 RTDB 的 shops/<新 key>，与天胡门店数据隔离；REST 轮询同步 */
+/* Firebase：独立项目 pindoushop 下的 shops/<key>/state；REST 轮询同步 */
 const FB_URL = "https://pindoushop-default-rtdb.asia-southeast1.firebasedatabase.app/shops/pindou-b7f9a52ba498/state.json";
+const FB_VER_URL = FB_URL.replace(/\/state\.json$/, "/__sysVer.json");
+const APP_VER = "v0.2.0", APP_DATE = "2026-11-24";
+const CHANGELOG = [
+  {ver:"v0.2.0", date:"2026-11-24", title:"去烫位、改 Zetland、加版本广播", items:[
+    "去掉烫位队列：结算收款即完成，熨烫由店员线下处理",
+    "顶部统计改为「今日单数 / 平均客单」",
+    "门店地点改为 Zetland",
+    "新增版本号、更新日志、发布后自动广播刷新",
+    "修复测试数据留下的「上一单」记录"
+  ]},
+  {ver:"v0.1.0", date:"2026-11-24", title:"第一版 10 工位看板", items:[
+    "10 个工位；智能板 / 普通板",
+    "按小时（15 分钟进位）或 2 小时套餐",
+    "现金 / 刷卡 / 会员优惠结算",
+    "Firebase 多设备同步；GitHub Pages 部署"
+  ]}
+];
 
 const DEFAULT_SETTINGS = {
   smartHourly: 15, normalHourly: 10,
@@ -493,6 +530,62 @@ function openSettle(seat, ms){
   });
 }
 
+/* 更新日志 */
+function openChangelog(){
+  openModal(`更新日志 · ${APP_VER}`, () => {
+    $("#mBody").innerHTML = `<div class="chlog">` + CHANGELOG.map(c => `
+      <div class="chver">
+        <div class="ch"><b>${c.ver} · ${c.title}</b><span>${c.date}</span></div>
+        <ul>${c.items.map(x => `<li>${x}</li>`).join("")}</ul>
+      </div>`).join("") + `</div>`;
+    $("#mFoot").innerHTML = `<button class="btn" data-act="close">关闭</button>`;
+  }, e => { if (e.target.closest('[data-act="close"]')) closeModal(); });
+}
+$("#verBtn").addEventListener("click", openChangelog);
+
+/* 版本广播：发布后所有打开页面自动刷新 */
+let updatePending = false;
+function isBusyForReload(){
+  if ($("#modal").classList.contains("on")) return true;
+  const a = document.activeElement;
+  if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return true;
+  return state.seats.some(s => s.status !== "idle");
+}
+function showUpdate(ver){
+  updatePending = true;
+  $("#upVer").textContent = ver;
+  $("#updateBar").classList.add("on");
+}
+function reloadTo(ver){
+  location.replace(location.pathname + "?v=" + encodeURIComponent(ver) + "&t=" + Date.now());
+}
+function isNewerVer(a, b){
+  const A = String(a).replace(/^v/i, "").split(".").map(x => parseInt(x, 10) || 0);
+  const B = String(b).replace(/^v/i, "").split(".").map(x => parseInt(x, 10) || 0);
+  for (let i = 0; i < Math.max(A.length, B.length); i++){
+    const x = A[i] || 0, y = B[i] || 0;
+    if (x !== y) return x > y;
+  }
+  return false;
+}
+async function checkVersion(){
+  if (!FB_VER_URL || document.hidden) return;
+  try {
+    const r = await fetch(FB_VER_URL + "?t=" + Date.now(), {cache:"no-store"});
+    if (!r.ok) return;
+    const v = await r.json();
+    if (!v || !v.ver) return;
+    if (!isNewerVer(v.ver, APP_VER)){ $("#updateBar").classList.remove("on"); return; }
+    if (isBusyForReload()) showUpdate(v.ver);
+    else reloadTo(v.ver);
+  } catch (e){}
+}
+$("#upBtn").addEventListener("click", () => reloadTo($("#upVer").textContent || APP_VER));
+$("#upLater").addEventListener("click", () => $("#updateBar").classList.remove("on"));
+setInterval(checkVersion, 20000);
+setTimeout(checkVersion, 1800);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) checkVersion(); });
+
 /* 设置 */
 $("#settingsBtn").addEventListener("click", openSettings);
 function openSettings(){
@@ -577,6 +670,8 @@ function initFB(){
 }
 
 /* 启动 */
+$("#verBtn").textContent = APP_VER;
+$("#verBtn").title = "更新日志 · " + APP_DATE;
 loadLocal();
 if (!state.updatedAt) state.updatedAt = 0;
 renderAll();
