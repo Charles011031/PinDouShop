@@ -20,7 +20,8 @@
 
 - 浏览器本地：`localStorage` 键 `pindou_board_v1`。
 - 云端：**独立 Firebase 项目** `pindoushop` 的 Realtime Database，路径 `shops/<独立 key>/state`；和天胡项目完全分开。
-- 当前是匿名读写（和天胡同款），**网址不要发群/朋友圈**；正式营业前建议加 Firebase Auth / 门店 PIN。
+- 当前是 Firebase **测试模式**（30 天后自动锁），规则是匿名读写；**网址不要发群/朋友圈**。
+- 正式营业前二选一：① 收紧规则到具体路径 + 门店 PIN；② 开 Anonymous Auth，规则改成 `auth != null`（页面需加登录，我可以加）。
 
 ## 价格
 
