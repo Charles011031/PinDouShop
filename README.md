@@ -36,16 +36,29 @@
 - 部署：GitHub Pages（main 分支根目录）。
 
 
-## 发布（自动广播刷新）
+## 发布工具（模仿天胡）
 
-改完代码后，把 `index.html` 的 `APP_VER`、`<meta name="app-ver">`、`版本记录.md` 第一条、README「当前版本」同步成同一个版本号，然后：
+`发布.py` 做 8 件事：
+
+1. 版本体检：`index.html` / meta / 页面 CHANGELOG / `版本记录.md` / README 五处必须一致
+2. 文件检查 + Chrome 无头冒烟（10 个工位、版本号、DOM 正常）
+3. Firebase 读写检查（state、`__sysVer`、临时探针写入/删除）
+4. GitHub 权限 + Pages 状态检查
+5. 发布锁：同一时间只能一个发布；异常退出自动释放
+6. GitHub 一次 commit 原子提交 5 个文件
+7. 等线上真的返回新版本（最多 3 分钟）
+8. 写 Firebase `__sysVer` 广播；打开中的页面 20 秒内自动刷新（有弹窗/计时中先弹提示条）
 
 ```bash
-python3 发布.py          # 推送 GitHub → 等线上生效 → 写 Firebase 版本广播
-python3 发布.py --check  # 只检查，不推送
+python3 发布.py            # 正式发布
+python3 发布.py --check    # 只体检
+python3 发布.py --no-tests # 跳过 Chrome 冒烟
+python3 发布.py --no-broadcast  # 推送并等线上，但不广播
 ```
 
-流程和天胡一样：**必须等线上真的返回新版本，才写 `__sysVer` 广播**。打开中的页面每 20 秒查一次版本；空闲时自动刷新，有弹窗/正在计时时先显示顶部提示条。
+Mac 也可以双击 `发布.command`。
+
+状态文件：`.发布状态.json`；日志：`发布日志/当前.log`；锁：`.发布锁`（都在 `.gitignore` 里）。
 
 ## 更新日志
 
