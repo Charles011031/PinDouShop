@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>拼豆店 · 工位看板</title>
-<meta name="app-ver" content="v0.2.0">
+<meta name="app-ver" content="v0.2.1">
 <style>
 :root{
   --bg:#f4efe6; --bg2:#fbf8f2; --card:#ffffff; --ink:#241f1a; --ink2:#4b4239; --muted:#7c7064;
@@ -163,7 +163,7 @@ aside{display:flex;flex-direction:column;gap:12px;position:sticky;top:78px}
     <div class="meta"><span id="dateTxt">—</span><span id="clockTxt">--:--:--</span></div>
     <div class="actions">
       <span class="sync" id="syncBadge">本地</span>
-      <button class="ver" id="verBtn" title="更新日志">v0.2.0</button>
+      <button class="ver" id="verBtn" title="更新日志">v0.2.1</button>
       <button class="btn sm" id="settingsBtn">⚙ 设置</button>
     </div>
   </div>
@@ -235,8 +235,15 @@ const BILL = {hourly:"按小时", package:"2 小时套餐"};
 /* Firebase：独立项目 pindoushop 下的 shops/<key>/state；REST 轮询同步 */
 const FB_URL = "https://pindoushop-default-rtdb.asia-southeast1.firebasedatabase.app/shops/pindou-b7f9a52ba498/state.json";
 const FB_VER_URL = FB_URL.replace(/\/state\.json$/, "/__sysVer.json");
-const APP_VER = "v0.2.0", APP_DATE = "2026-11-24";
+const APP_VER = "v0.2.1", APP_DATE = "2026-11-24";
 const CHANGELOG = [
+  {ver:"v0.2.1", date:"2026-11-24", title:"发布工具升级", items:[
+    "发布前体检：版本一致性 / Chrome 冒烟 / Firebase 读写 / GitHub 权限",
+    "发布锁 + 状态文件 + 发布日志，防止重复发布",
+    "GitHub 一次 commit 原子提交，不再一文件一提交",
+    "等线上真的返回新版本后，再写 __sysVer 广播",
+    "新增 发布.command，Mac 双击即可发布"
+  ]},
   {ver:"v0.2.0", date:"2026-11-24", title:"去烫位、改 Zetland、加版本广播", items:[
     "去掉烫位队列：结算收款即完成，熨烫由店员线下处理",
     "顶部统计改为「今日单数 / 平均客单」",
