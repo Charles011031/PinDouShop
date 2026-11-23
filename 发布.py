@@ -18,7 +18,7 @@ import urllib.error, urllib.parse, urllib.request
 ROOT = pathlib.Path(__file__).resolve().parent
 OWNER, REPO, BRANCH = "Charles011031", "PinDouShop", "main"
 LIVE = "https://charles011031.github.io/PinDouShop/"
-FILES = ["index.html", "README.md", "版本记录.md", "发布.py", "发布.command"]
+FILES = ["index.html", "README.md", "版本记录.md", "生成更新日志.py", "更新日志规范.md", "发布.py", "发布.command"]
 TOKEN_FILE = pathlib.Path.home() / ".dsh-github-token"
 API = "https://api.github.com"
 STATE_FILE = ROOT / ".发布状态.json"
@@ -78,14 +78,14 @@ def read_version():
     checks = []
     meta = re.search(r'<meta name="app-ver" content="([^"]+)"', html)
     checks.append(("meta app-ver", meta.group(1) if meta else None))
-    ch = re.search(r'\{ver:"(v[0-9][^"]*)"', html)
-    checks.append(("页面 CHANGELOG 第一条", ch.group(1) if ch else None))
     text = (ROOT / "版本记录.md").read_text(encoding="utf-8")
-    c = re.search(r'^\|\s*(v[0-9][^\s|]*)\s*\|', text, re.M)
+    c = re.search(r'^\|\s*\**\s*(v[0-9][^\s|*]*)\s*\**\s*（', text, re.M)
     checks.append(("版本记录.md 第一条", c.group(1) if c else None))
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     r = re.search(r'当前版本\**\s*[：:]\s*(v[0-9][0-9.]*)', readme)
     checks.append(("README 当前版本", r.group(1) if r else None))
+    t = re.search(r'^\|\s*\*\*(v[0-9][^\s|*]*)', readme, re.M)
+    checks.append(("README 版本表第一条", t.group(1) if t else None))
     print("• 版本体检：%s" % VERSION)
     bad = [(n, v) for n, v in checks if v and v != VERSION]
     for n, v in checks:
@@ -100,6 +100,19 @@ def read_version():
     if "tianhu-fd795" in html:
         die("页面里还残留天胡 Firebase 地址，拒绝发布")
     return html
+
+
+def check_changelog():
+    print("• 更新日志检查：")
+    try:
+        r = subprocess.run([sys.executable, str(ROOT / "生成更新日志.py"), "--check"],
+                           capture_output=True, text=True, timeout=30)
+    except Exception as e:
+        die("运行 生成更新日志.py 失败：%s" % e)
+    out = (r.stdout or r.stderr or "").strip()
+    if r.returncode != 0:
+        die("更新日志未同步：%s\n  先运行：python3 生成更新日志.py" % out)
+    print("   ✓ " + (out.splitlines()[-1].lstrip("✓ ").strip() if out else "已同步"))
 
 
 def check_files():
@@ -362,6 +375,7 @@ def main():
     try:
         html = read_version()
         set_state("running", "版本体检")
+        check_changelog()
         check_files()
         if not args.no_tests:
             chrome_smoke()

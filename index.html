@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>拼豆店 · 工位看板</title>
-<meta name="app-ver" content="v0.2.2">
+<meta name="app-ver" content="v0.2.3">
 <style>
 :root{
   --bg:#f4efe6; --bg2:#fbf8f2; --card:#ffffff; --ink:#241f1a; --ink2:#4b4239; --muted:#7c7064;
@@ -126,11 +126,29 @@ aside{display:flex;flex-direction:column;gap:12px;position:sticky;top:12px}
   background:#fff4d6;border-bottom:1px solid #ecd9a0;padding:8px 14px;font-size:12px;color:#6b4b08}
 .update.on{display:flex}
 .update b{font-family:var(--mono)}
-.chlog{display:flex;flex-direction:column;gap:10px;max-height:56vh;overflow:auto}
-.chver{border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:#fdfbf7}
-.chver .ch{display:flex;justify-content:space-between;gap:8px;font-size:12px;font-weight:800}
-.chver .ch span{font-family:var(--mono);font-size:10.5px;color:var(--muted);font-weight:600}
-.chver ul{margin:6px 0 0;padding-left:16px;font-size:11.5px;color:var(--ink2);line-height:1.65}
+.cl-sub{font-size:11.5px;color:var(--muted);margin-bottom:8px;line-height:1.5}
+.cl-body{max-height:58vh;overflow:auto;margin:0 -4px;padding:0 4px;-webkit-overflow-scrolling:touch}
+.cl-item{border-bottom:1px dashed var(--line2);padding:0}
+.cl-item:last-child{border-bottom:0}
+.cl-row{display:grid;width:100%;text-align:left;background:none;border:0;padding:10px 0;font:inherit;color:var(--ink);
+  align-items:center;gap:2px 8px;grid-template-columns:auto auto 1fr auto;grid-template-areas:"ver date n arrow" "sum sum sum sum";cursor:pointer}
+.cl-ver{grid-area:ver;display:inline-block;font-size:12px;font-weight:800;color:#fff;background:var(--ink);border-radius:999px;padding:2px 9px;letter-spacing:.2px}
+.cl-date{grid-area:date;font-size:11.5px;color:var(--muted);font-family:var(--mono)}
+.cl-n{grid-area:n;font-size:11px;font-weight:700;color:var(--muted)}
+.cl-arrow{grid-area:arrow;font-size:12px;font-weight:800;color:#9a8d7e;transition:transform .16s}
+.cl-sum{grid-area:sum;margin-top:4px;font-size:13px;line-height:1.55;color:#3f362e;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.cl-item.on{background:#fbf6ef;border-radius:10px;padding:0 10px;margin:0 -10px}
+.cl-item.on .cl-sum{display:none}
+.cl-item.on .cl-arrow{transform:rotate(180deg)}
+.cl-detail{display:none}
+.cl-item.on .cl-detail{display:block;padding-bottom:10px}
+.cl-detail ul{margin:2px 0 0;padding-left:17px;font-size:12.5px;line-height:1.7;color:var(--ink2)}
+.cl-detail li{margin:3px 0}
+.cl-detail li b{color:var(--accent)}
+.cl-detail code{background:#f2ece2;border-radius:4px;padding:0 4px;font-size:11.5px;font-family:var(--mono)}
+.cl-more{font-size:12px;font-weight:700;color:var(--accent);text-decoration:none;margin-right:auto}
+.cl-more:hover{text-decoration:underline}
+.mbox.wide{max-width:620px}
 
 /* modal */
 .modal{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(35,28,22,.5);backdrop-filter:blur(3px)}
@@ -175,7 +193,7 @@ aside{display:flex;flex-direction:column;gap:12px;position:sticky;top:12px}
       <h1>
         <span class="beads"><i></i><i></i><i></i><i></i></span>
         拼豆店
-        <button class="ver" id="verBtn" title="更新日志">v0.2.2</button>
+        <button class="ver" id="verBtn" title="更新日志">v0.2.3</button>
       </h1>
       <div class="sub">
         <span>Zetland · 10 个工位 · 智能板 / 普通板 · 豆子不限量</span>
@@ -248,6 +266,7 @@ const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
 const money = n => "$" + (Math.round((+n || 0) * 100) / 100).toFixed(2);
 const round2 = n => Math.round((+n || 0) * 100) / 100;
 const pad2 = n => String(n).padStart(2, "0");
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmtDur = ms => {
   const s = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = s % 60;
   return [h, m, ss].map(pad2).join(":");
@@ -261,35 +280,16 @@ const BILL = {hourly:"按小时", package:"2 小时套餐"};
 /* Firebase：独立项目 pindoushop 下的 shops/<key>/state；REST 轮询同步 */
 const FB_URL = "https://pindoushop-default-rtdb.asia-southeast1.firebasedatabase.app/shops/pindou-b7f9a52ba498/state.json";
 const FB_VER_URL = FB_URL.replace(/\/state\.json$/, "/__sysVer.json");
-const APP_VER = "v0.2.2", APP_DATE = "2026-11-24";
-const CHANGELOG = [
-  {ver:"v0.2.2", date:"2026-11-24", title:"顶部栏改为天胡式布局", items:[
-    "顶部改成圆角渐变卡片：左侧标题 + 版本号，右侧价格摘要 + 同步状态 + 刷新/设置图标",
-    "价格摘要合并显示两个板型时价和套餐价，点一下打开设置",
-    "移动端自动换行：标题一行、价格摘要一行、图标按钮靠右",
-    "日期/时钟收进副标题；保留版本号点击看更新日志"
-  ]},
-  {ver:"v0.2.1", date:"2026-11-24", title:"发布工具升级", items:[
-    "发布前体检：版本一致性 / Chrome 冒烟 / Firebase 读写 / GitHub 权限",
-    "发布锁 + 状态文件 + 发布日志，防止重复发布",
-    "GitHub 一次 commit 原子提交，不再一文件一提交",
-    "等线上真的返回新版本后，再写 __sysVer 广播",
-    "新增 发布.command，Mac 双击即可发布"
-  ]},
-  {ver:"v0.2.0", date:"2026-11-24", title:"去烫位、改 Zetland、加版本广播", items:[
-    "去掉烫位队列：结算收款即完成，熨烫由店员线下处理",
-    "顶部统计改为「今日单数 / 平均客单」",
-    "门店地点改为 Zetland",
-    "新增版本号、更新日志、发布后自动广播刷新",
-    "修复测试数据留下的「上一单」记录"
-  ]},
-  {ver:"v0.1.0", date:"2026-11-24", title:"第一版 10 工位看板", items:[
-    "10 个工位；智能板 / 普通板",
-    "按小时（15 分钟进位）或 2 小时套餐",
-    "现金 / 刷卡 / 会员优惠结算",
-    "Firebase 多设备同步；GitHub Pages 部署"
-  ]}
+const APP_VER = "v0.2.3", APP_DATE = "2026-11-24";
+// >>> APP_CHANGELOG BEGIN（自动生成，勿手改）
+const APP_CHANGELOG = [
+  { ver: "v0.2.3", date: "2026-11-24", sum: "更新日志改为手风琴并统一规范", items: ["调整 更新日志唯一来源改为 README 的「最近 15 个版本」表格，由 `生成更新日志.py` 注入页面", "新增 弹窗默认收起，一行显示版本、日期、条数、摘要，点一行展开详情", "调整 详情按「新增、调整、修复、移除、优化、测试」开头，摘要不超过 28 字", "新增 发布体检校验页面内嵌日志与 README 是否同步。"] },
+  { ver: "v0.2.2", date: "2026-11-24", sum: "顶部栏改为天胡式卡片布局", items: ["调整 顶部栏改为圆角渐变卡片，标题与版本号同行", "新增 价格摘要显示两种板型时价与套餐价，点击打开设置", "调整 同步状态、刷新、设置改为图标按钮，移动端自动换行。"] },
+  { ver: "v0.2.1", date: "2026-11-24", sum: "新增一键发布工具", items: ["新增 发布前版本、文件、Chrome、Firebase、GitHub 体检", "新增 发布锁、状态文件与发布日志", "优化 GitHub 改为一次 commit 原子提交", "新增 等线上生效后写 `__sysVer` 广播。"] },
+  { ver: "v0.2.0", date: "2026-11-24", sum: "移除烫位队列并改到 Zetland", items: ["移除 烫位排队、熨烫中、可取件状态，结算收款即完成", "调整 顶部统计改为今日单数、平均客单", "调整 门店位置改为 Zetland", "新增 版本号、更新日志、发布后自动广播刷新。"] },
+  { ver: "v0.1.0", date: "2026-11-24", sum: "第一版 10 工位看板上线", items: ["新增 10 个工位与智能板、普通板选择", "新增 按小时与 2 小时套餐计费", "新增 现金、刷卡、会员优惠结算", "新增 Firebase 多设备同步与 GitHub Pages 部署。"] },
 ];
+// <<< APP_CHANGELOG END（自动生成，勿手改）
 
 const DEFAULT_SETTINGS = {
   smartHourly: 15, normalHourly: 10,
@@ -445,13 +445,14 @@ function tick(){
 
 /* 模态框 */
 let M = {build:null, click:null};
-function openModal(title, build, click){
+function openModal(title, build, click, wide){
   M = {build, click};
   $("#mTitle").textContent = title;
+  $(".mbox").classList.toggle("wide", !!wide);
   $("#modal").classList.add("on");
   build();
 }
-function closeModal(){ $("#modal").classList.remove("on"); M = {build:null, click:null}; }
+function closeModal(){ $("#modal").classList.remove("on"); $(".mbox").classList.remove("wide"); M = {build:null, click:null}; }
 $("#mClose").addEventListener("click", closeModal);
 $("#modal").addEventListener("click", e => { if (e.target === $("#modal")) closeModal(); });
 $("#mBody").addEventListener("click", e => { if (M.click) M.click(e); });
@@ -574,16 +575,50 @@ function openSettle(seat, ms){
   });
 }
 
-/* 更新日志 */
+/* 更新日志（数据由 生成更新日志.py 从 README 注入） */
+function clLine(s){
+  return esc(String(s == null ? "" : s))
+    .replace(/^(新增|调整|修复|移除|优化|测试)\s/, "<b>$1</b> ")
+    .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>");
+}
+function clSum(it){
+  const s = (it && it.sum) ? String(it.sum).trim() : "";
+  if (s) return s;
+  const items = (it && it.items) || [];
+  const t = items.length ? String(items[0]).replace(/\*\*/g, "").replace(/`/g, "").trim() : "";
+  return t.length > 40 ? t.slice(0, 40) + "…" : t;
+}
 function openChangelog(){
-  openModal(`更新日志 · ${APP_VER}`, () => {
-    $("#mBody").innerHTML = `<div class="chlog">` + CHANGELOG.map(c => `
-      <div class="chver">
-        <div class="ch"><b>${c.ver} · ${c.title}</b><span>${c.date}</span></div>
-        <ul>${c.items.map(x => `<li>${x}</li>`).join("")}</ul>
-      </div>`).join("") + `</div>`;
-    $("#mFoot").innerHTML = `<button class="btn" data-act="close">关闭</button>`;
-  }, e => { if (e.target.closest('[data-act="close"]')) closeModal(); });
+  openModal("更新日志", () => {
+    const list = (typeof APP_CHANGELOG !== "undefined" && APP_CHANGELOG) || [];
+    $("#mBody").innerHTML = `<div class="cl-sub">当前 ${APP_VER} · ${APP_DATE} · 最近 ${list.length} 个版本 · 点一行看详情</div><div class="cl-body">` +
+      (list.length ? list.map((it, i) => {
+        const items = it.items || [];
+        return `<div class="cl-item" data-i="${i}">
+          <button class="cl-row" type="button" aria-expanded="false">
+            <span class="cl-ver">${esc(it.ver || "")}</span>
+            <span class="cl-date">${esc(it.date || "")}</span>
+            <span class="cl-n">${items.length} 条</span>
+            <span class="cl-arrow">▾</span>
+            <span class="cl-sum">${esc(clSum(it))}</span>
+          </button>
+          <div class="cl-detail"><ul>${items.map(x => `<li>${clLine(x)}</li>`).join("")}</ul></div>
+        </div>`;
+      }).join("") : `<div class="cl-sub">暂无更新日志</div>`) + `</div>`;
+    $("#mFoot").innerHTML = `<a class="cl-more" href="https://github.com/Charles011031/PinDouShop/blob/main/${encodeURIComponent("版本记录.md")}" target="_blank" rel="noopener">完整版本记录</a><button class="btn" data-act="close">关闭</button>`;
+  }, e => {
+    const row = e.target.closest(".cl-row");
+    if (row){
+      const item = row.closest(".cl-item");
+      const was = item.classList.contains("on");
+      $$(".cl-item").forEach(x => x.classList.remove("on"));
+      $$(".cl-row").forEach(x => x.setAttribute("aria-expanded", "false"));
+      if (!was){ item.classList.add("on"); row.setAttribute("aria-expanded", "true"); }
+      return;
+    }
+    if (e.target.closest('[data-act="close"]')) closeModal();
+  }, true);
 }
 $("#verBtn").addEventListener("click", openChangelog);
 
