@@ -2,7 +2,9 @@
 
 10 个工位的计时/收费看板，给悉尼拼豆店用。
 
-**线上**：https://charles011031.github.io/PinDouShop/
+**线上**：https://charles011031.github.io/PinDouShop/  
+**当前版本**：v0.2.0（2026-11-24）  
+**门店**：Zetland（悉尼）
 
 > 独立仓库 `Charles011031/PinDouShop`，main 分支根目录。
 
@@ -32,3 +34,19 @@
 
 - `index.html`：整个应用（单文件，无构建）。
 - 部署：GitHub Pages（main 分支根目录）。
+
+
+## 发布（自动广播刷新）
+
+改完代码后，把 `index.html` 的 `APP_VER`、`<meta name="app-ver">`、`版本记录.md` 第一条、README「当前版本」同步成同一个版本号，然后：
+
+```bash
+python3 发布.py          # 推送 GitHub → 等线上生效 → 写 Firebase 版本广播
+python3 发布.py --check  # 只检查，不推送
+```
+
+流程和天胡一样：**必须等线上真的返回新版本，才写 `__sysVer` 广播**。打开中的页面每 20 秒查一次版本；空闲时自动刷新，有弹窗/正在计时时先显示顶部提示条。
+
+## 更新日志
+
+页面右上角版本号 `v0.2.0` 可点，弹窗里是版本记录；完整历史见 [`版本记录.md`](版本记录.md)。
