@@ -57,6 +57,9 @@ def set_state(state, step="", extra=None):
         data.update(extra)
     try:
         STATE_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        LOG_DIR.mkdir(exist_ok=True)
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write("[%s] %s · %s · %s\n" % (time.strftime("%H:%M:%S"), state, step, VERSION))
     except Exception:
         pass
 
@@ -357,8 +360,8 @@ def main():
     ap.add_argument("--no-broadcast", action="store_true")
     args = ap.parse_args()
     try:
-        set_state("running", "版本体检")
         html = read_version()
+        set_state("running", "版本体检")
         check_files()
         if not args.no_tests:
             chrome_smoke()
