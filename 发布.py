@@ -30,6 +30,9 @@ def read_ver():
     meta = re.search(r'<meta name="app-ver" content="([^"]+)"', html)
     if meta and meta.group(1) != m.group(1):
         die("APP_VER 与 meta app-ver 不一致：%s / %s" % (m.group(1), meta.group(1)))
+    ch = re.search(r'\{ver:"(v[0-9][^"]*)"', html)
+    if ch and ch.group(1) != m.group(1):
+        die("页面 CHANGELOG 第一条不是 %s（是 %s）" % (m.group(1), ch.group(1)))
     return m.group(1), html
 
 
