@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>拼豆店 · 工位看板</title>
-<meta name="app-ver" content="v0.7.4">
+<meta name="app-ver" content="v0.7.5">
 <style>
 :root{
   --bg:#f4efe6; --bg2:#fbf8f2; --card:#ffffff; --ink:#241f1a; --ink2:#4b4239; --muted:#7c7064;
@@ -74,7 +74,7 @@ button{font-family:inherit;cursor:pointer}
 .btn.lg{padding:11px 16px;font-size:13.5px;border-radius:12px}
 
 /* summary */
-main.wrap{padding:22px 0 44px;flex:1 0 auto}
+main.wrap{padding:22px 22px 44px;flex:1 0 auto}
 .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
 .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;box-shadow:var(--shadow)}
 .stat .l{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.03em}
@@ -309,7 +309,7 @@ body{
   .stat .st-ico{width:24px;height:24px}
   .foot{padding-bottom:22px}
 }
-@media(max-width:820px){.top-wrap{padding-top:18px}main.wrap{padding:18px 0 40px}.summary{margin-bottom:14px}}
+@media(max-width:820px){.top-wrap{padding-top:18px}main.wrap{padding:18px 22px 40px}.summary{margin-bottom:14px}}
 
 /* ============================================================
    结算弹窗 —— 样式照搬自 天胡麻将系统/app.css:406-440 / 2151-2250 / 2700-2770
@@ -404,7 +404,7 @@ body{
    mahjong-timer.html:80-85 页签、:388-456 员工、:457-489 统计）
    ============================================================ */
 .tabs{display:flex;width:100%;max-width:1280px;margin:14px auto 0;padding:0 22px}
-@media(max-width:560px){.tabs{padding:0 14px}}
+@media(max-width:560px){.tabs{padding:0 14px}main.wrap{padding:18px 14px 40px}}
 .seg{position:relative;display:flex;width:min(430px,100%);background:#fff;border:1px solid var(--line);
   border-radius:13px;padding:4px;box-shadow:var(--shadow-sm)}
 .seg-slider{position:absolute;top:4px;bottom:4px;left:4px;width:0;border-radius:9px;background:var(--ink);
@@ -686,7 +686,7 @@ table.rt select.mini-sel{padding:4px 6px;font-size:11px;border-radius:8px;backgr
       <h1>
         <span class="beads"><i></i><i></i><i></i><i></i></span>
         拼豆店
-        <button class="ver" id="verBtn" title="更新日志">v0.7.4</button>
+        <button class="ver" id="verBtn" title="更新日志">v0.7.5</button>
       </h1>
       <div class="sub">
         <span>Zetland · 10 个工位 · 智能板 / 普通板 · 豆子不限量</span>
@@ -891,7 +891,7 @@ table.rt select.mini-sel{padding:4px 6px;font-size:11px;border-radius:8px;backgr
 
 <footer class="foot">
   <span>拼豆店 · Zetland · 10 个工位</span>
-  <span>数据每 3 秒同步 · <b id="footVer">v0.7.4</b></span>
+  <span>数据每 3 秒同步 · <b id="footVer">v0.7.5</b></span>
 </footer>
 
 <div class="modal" id="modal">
@@ -1034,9 +1034,10 @@ const round4 = n => Math.round((+n || 0) * 10000) / 10000;
 /* Firebase：独立项目 pindoushop 下的 shops/<key>/state；REST 轮询同步 */
 const FB_URL = "https://pindoushop-default-rtdb.asia-southeast1.firebasedatabase.app/shops/pindou-b7f9a52ba498/state.json";
 const FB_VER_URL = FB_URL.replace(/\/state\.json$/, "/__sysVer.json");
-const APP_VER = "v0.7.4", APP_DATE = "2026-11-27";
+const APP_VER = "v0.7.5", APP_DATE = "2026-11-27";
 // >>> APP_CHANGELOG BEGIN（自动生成，勿手改）
 const APP_CHANGELOG = [
+  { ver: "v0.7.5", date: "2026-11-27", sum: "顶部和内容的左右边距对齐了", items: ["修复 内容区左右内边距是 0，顶部卡片和页签比内容窄 22px，宽屏下「今日收款」右侧还会贴边", "调整 桌面和平板统一 22px、手机 14px，顶栏 / 页签 / 内容三块用同一组边距", "测试 页面冒烟 81 项、配件冒烟 47 项、结算冒烟 27 项共 155 项全绿。"] },
   { ver: "v0.7.4", date: "2026-11-27", sum: "页签换分段控件，切换滑过去", items: ["调整 顶部页签顺序改成工位 / 配件 / 员工 / 统计", "调整 页签改成一整条分段控件，选中的深色块切换时滑过去（0.26s，手机同上），首屏不滑", "新增 切换页面时内容轻微淡入上移（0.22s），切换更有实感但不晕", "测试 页面冒烟 81 项（含顺序与滑块）、配件冒烟 47 项、结算冒烟 27 项共 155 项全绿。"] },
   { ver: "v0.7.3", date: "2026-11-27", sum: "配件卡改横向紧凑，右边不再空一片", items: ["调整 配件卡改成「照片 / 图标 + 名称 + 价格 · 库存」横排，加购按钮挪到右侧居中，卡片高度从 130px 收到 68px", "调整 网格改成自适应列数（宽屏 5 列、平板 3 列、手机 2 列），商品多时一屏能多看几行", "调整 编辑模式下整张卡可点，铅笔在右侧居中", "测试 配件冒烟 47 项、结算冒烟 27 项、页面冒烟 79 项共 153 项全绿。"] },
   { ver: "v0.7.2", date: "2026-11-27", sum: "配件卡收紧，编辑模式整张卡可点", items: ["调整 配件卡去掉多余留白，高度跟随内容，名称不再固定预留两行，价格与库存贴底对齐", "调整 编辑模式下整张卡片都能点开编辑（原来只能点右上角铅笔），并加了悬停反馈", "测试 配件冒烟 47 项、结算冒烟 27 项、页面冒烟 79 项共 153 项全绿。"] },
@@ -1051,7 +1052,6 @@ const APP_CHANGELOG = [
   { ver: "v0.6.0", date: "2026-11-27", sum: "设置拆分到对应页面，上班打卡可填时间", items: ["调整 设置拆成两块，板型与价格放进工位页「价格」按钮与顶部价格摘要，收款与汇率放进统计页「收款设置」，工资相关仍在员工页工资汇总", "移除 顶部统一的「设置」图标，不再一个弹窗塞十几项", "新增 员工上班打卡可以手动输入上班日期与时间，默认现在，另有「用现在」按钮", "修复 保存价格时会整体替换设置对象，把白班晚班时薪与忙日门槛冲掉的问题", "测试 页面冒烟扩展到 61 项断言，覆盖设置拆分与手动打卡。"] },
   { ver: "v0.5.1", date: "2026-11-27", sum: "今日收款面板与工位区等高", items: ["调整 侧栏「今日收款」高度与左边工位区对齐，超出的记录在面板内滚动", "调整 面板底部加渐隐提示，能看出下面还有内容", "修复 之前用 grid 拉伸对齐会反过来把工位区撑高，改为由工位区定高、侧栏封顶", "测试 页面冒烟 38 项与结算冒烟 27 项回归通过。"] },
   { ver: "v0.5.0", date: "2026-11-27", sum: "新增统计页与员工页，收款记录能看全部", items: ["新增 顶部页签分为工位、统计、员工三页，工位页下方新增结算记录全表，按日期分组、每组小计、可搜索、分页", "新增 统计页支持按日、按周、按月切换与前后翻页，展示营业总额、台费、其它费用、手续费、人民币、客单与计时总长，并可生成统计文案", "新增 员工页支持员工名单、上下班打卡、手动补录与修改、班次指定，工资按白班晚班时薪与忙日加成汇总，可按月或按周查看", "调整 侧栏今日收款不再截断 8 条，改为列出当天全部并在面板内滚动", "测试 页面冒烟覆盖页签、记录分组分页、统计口径、工资计算共 38 项断言。"] },
-  { ver: "v0.4.0", date: "2026-11-27", sum: "结账改为天胡式收款明细与挂账补收", items: ["新增 结算弹窗改为收款明细逐笔记账，可按笔选现金、刷卡、人民币并拆成混合支付，刷卡可填实收自动反推本金", "新增 少收的钱可选记在工位上或直接免除，工位卡出现补收入口，补收只收欠款不再叠加台费", "调整 结算记录存 `parts` 明细与起止时间字段，今日收款可点开原地修改或删除，旧记录自动迁移", "测试 真 Chrome 跑通开台、结算、编辑、撤销结束、挂账补收 25 项断言，发布体检含日志一致性。"] },
 ];
 // <<< APP_CHANGELOG END（自动生成，勿手改）
 
