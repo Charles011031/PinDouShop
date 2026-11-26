@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>拼豆店 · 工位看板</title>
-<meta name="app-ver" content="v0.7.3">
+<meta name="app-ver" content="v0.7.4">
 <style>
 :root{
   --bg:#f4efe6; --bg2:#fbf8f2; --card:#ffffff; --ink:#241f1a; --ink2:#4b4239; --muted:#7c7064;
@@ -403,14 +403,18 @@ body{
    页签 + 统计页 + 员工页（结构照搬自 天胡麻将系统：
    mahjong-timer.html:80-85 页签、:388-456 员工、:457-489 统计）
    ============================================================ */
-.tabs{display:flex;gap:6px;width:100%;max-width:1280px;margin:14px auto 0;padding:0 22px;flex-wrap:wrap}
+.tabs{display:flex;width:100%;max-width:1280px;margin:14px auto 0;padding:0 22px}
 @media(max-width:560px){.tabs{padding:0 14px}}
-.tab{border:1px solid var(--line);background:#fff;border-radius:11px;padding:8px 15px;font-size:12.5px;font-weight:800;
-  color:var(--muted);display:inline-flex;align-items:center;gap:6px;transition:.12s}
-.tab:hover{color:var(--ink);border-color:#cfc3b1}
-.tab.on{background:var(--ink);border-color:var(--ink);color:#fff}
-.tab .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);display:none}
-.tab.on .dot{display:inline-block}
+.seg{position:relative;display:flex;width:min(430px,100%);background:#fff;border:1px solid var(--line);
+  border-radius:13px;padding:4px;box-shadow:var(--shadow-sm)}
+.seg-slider{position:absolute;top:4px;bottom:4px;left:4px;width:0;border-radius:9px;background:var(--ink);
+  box-shadow:0 4px 12px rgba(36,31,26,.26);transition:transform .26s cubic-bezier(.4,0,.2,1),width .26s cubic-bezier(.4,0,.2,1);pointer-events:none}
+.tab{position:relative;z-index:1;flex:1;border:0;background:none;padding:8px 10px;border-radius:9px;
+  font-size:12.5px;font-weight:800;color:var(--muted);transition:color .18s;white-space:nowrap}
+.tab:hover{color:var(--ink)}
+.tab.on{color:#fff}
+@keyframes paneIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+#pane-board,#pane-stats,#pane-staff,#pane-retail{animation:paneIn .22s cubic-bezier(.3,.7,.4,1)}
 [hidden]{display:none !important}
 
 /* 侧栏今日收款：全部列出、面板内滚动（原来只显示 8 条，多了看不到） */
@@ -682,7 +686,7 @@ table.rt select.mini-sel{padding:4px 6px;font-size:11px;border-radius:8px;backgr
       <h1>
         <span class="beads"><i></i><i></i><i></i><i></i></span>
         拼豆店
-        <button class="ver" id="verBtn" title="更新日志">v0.7.3</button>
+        <button class="ver" id="verBtn" title="更新日志">v0.7.4</button>
       </h1>
       <div class="sub">
         <span>Zetland · 10 个工位 · 智能板 / 普通板 · 豆子不限量</span>
@@ -708,10 +712,13 @@ table.rt select.mini-sel{padding:4px 6px;font-size:11px;border-radius:8px;backgr
 </div>
 
 <nav class="tabs" id="tabs">
-  <button class="tab on" data-tab="board"><span class="dot"></span>工位</button>
-  <button class="tab" data-tab="stats"><span class="dot"></span>统计</button>
-  <button class="tab" data-tab="staff"><span class="dot"></span>员工</button>
-  <button class="tab" data-tab="retail"><span class="dot"></span>配件</button>
+  <div class="seg" id="seg">
+    <span class="seg-slider" id="segSlider"></span>
+    <button class="tab on" data-tab="board">工位</button>
+    <button class="tab" data-tab="retail">配件</button>
+    <button class="tab" data-tab="staff">员工</button>
+    <button class="tab" data-tab="stats">统计</button>
+  </div>
 </nav>
 <main class="wrap">
 <div id="pane-board">
@@ -884,7 +891,7 @@ table.rt select.mini-sel{padding:4px 6px;font-size:11px;border-radius:8px;backgr
 
 <footer class="foot">
   <span>拼豆店 · Zetland · 10 个工位</span>
-  <span>数据每 3 秒同步 · <b id="footVer">v0.7.3</b></span>
+  <span>数据每 3 秒同步 · <b id="footVer">v0.7.4</b></span>
 </footer>
 
 <div class="modal" id="modal">
@@ -1027,9 +1034,10 @@ const round4 = n => Math.round((+n || 0) * 10000) / 10000;
 /* Firebase：独立项目 pindoushop 下的 shops/<key>/state；REST 轮询同步 */
 const FB_URL = "https://pindoushop-default-rtdb.asia-southeast1.firebasedatabase.app/shops/pindou-b7f9a52ba498/state.json";
 const FB_VER_URL = FB_URL.replace(/\/state\.json$/, "/__sysVer.json");
-const APP_VER = "v0.7.3", APP_DATE = "2026-11-27";
+const APP_VER = "v0.7.4", APP_DATE = "2026-11-27";
 // >>> APP_CHANGELOG BEGIN（自动生成，勿手改）
 const APP_CHANGELOG = [
+  { ver: "v0.7.4", date: "2026-11-27", sum: "页签换分段控件，切换滑过去", items: ["调整 顶部页签顺序改成工位 / 配件 / 员工 / 统计", "调整 页签改成一整条分段控件，选中的深色块切换时滑过去（0.26s，手机同上），首屏不滑", "新增 切换页面时内容轻微淡入上移（0.22s），切换更有实感但不晕", "测试 页面冒烟 81 项（含顺序与滑块）、配件冒烟 47 项、结算冒烟 27 项共 155 项全绿。"] },
   { ver: "v0.7.3", date: "2026-11-27", sum: "配件卡改横向紧凑，右边不再空一片", items: ["调整 配件卡改成「照片 / 图标 + 名称 + 价格 · 库存」横排，加购按钮挪到右侧居中，卡片高度从 130px 收到 68px", "调整 网格改成自适应列数（宽屏 5 列、平板 3 列、手机 2 列），商品多时一屏能多看几行", "调整 编辑模式下整张卡可点，铅笔在右侧居中", "测试 配件冒烟 47 项、结算冒烟 27 项、页面冒烟 79 项共 153 项全绿。"] },
   { ver: "v0.7.2", date: "2026-11-27", sum: "配件卡收紧，编辑模式整张卡可点", items: ["调整 配件卡去掉多余留白，高度跟随内容，名称不再固定预留两行，价格与库存贴底对齐", "调整 编辑模式下整张卡片都能点开编辑（原来只能点右上角铅笔），并加了悬停反馈", "测试 配件冒烟 47 项、结算冒烟 27 项、页面冒烟 79 项共 153 项全绿。"] },
   { ver: "v0.7.1", date: "2026-11-27", sum: "配件可以放照片，自己裁成小图", items: ["新增 商品照片，选图后拖动位置、滑杆或滚轮缩放，存成 200×200 JPEG 小图，卡片上直接显示", "新增 照片存进商品里，多设备同步，数据没变时用 ETag 跳过下载，加了照片也不费流量", "调整 选完照片不会清掉已经填好的名称 / 价格 / 库存（先读回再重绘）", "测试 配件冒烟 47 项、结算冒烟 27 项、页面冒烟 79 项共 153 项全绿。"] },
@@ -1044,7 +1052,6 @@ const APP_CHANGELOG = [
   { ver: "v0.5.1", date: "2026-11-27", sum: "今日收款面板与工位区等高", items: ["调整 侧栏「今日收款」高度与左边工位区对齐，超出的记录在面板内滚动", "调整 面板底部加渐隐提示，能看出下面还有内容", "修复 之前用 grid 拉伸对齐会反过来把工位区撑高，改为由工位区定高、侧栏封顶", "测试 页面冒烟 38 项与结算冒烟 27 项回归通过。"] },
   { ver: "v0.5.0", date: "2026-11-27", sum: "新增统计页与员工页，收款记录能看全部", items: ["新增 顶部页签分为工位、统计、员工三页，工位页下方新增结算记录全表，按日期分组、每组小计、可搜索、分页", "新增 统计页支持按日、按周、按月切换与前后翻页，展示营业总额、台费、其它费用、手续费、人民币、客单与计时总长，并可生成统计文案", "新增 员工页支持员工名单、上下班打卡、手动补录与修改、班次指定，工资按白班晚班时薪与忙日加成汇总，可按月或按周查看", "调整 侧栏今日收款不再截断 8 条，改为列出当天全部并在面板内滚动", "测试 页面冒烟覆盖页签、记录分组分页、统计口径、工资计算共 38 项断言。"] },
   { ver: "v0.4.0", date: "2026-11-27", sum: "结账改为天胡式收款明细与挂账补收", items: ["新增 结算弹窗改为收款明细逐笔记账，可按笔选现金、刷卡、人民币并拆成混合支付，刷卡可填实收自动反推本金", "新增 少收的钱可选记在工位上或直接免除，工位卡出现补收入口，补收只收欠款不再叠加台费", "调整 结算记录存 `parts` 明细与起止时间字段，今日收款可点开原地修改或删除，旧记录自动迁移", "测试 真 Chrome 跑通开台、结算、编辑、撤销结束、挂账补收 25 项断言，发布体检含日志一致性。"] },
-  { ver: "v0.3.2", date: "2026-11-24", sum: "新增人民币收款与实时汇率", items: ["新增 结算支持人民币收款，按设置汇率把澳币应收折算成人民币，记录中保存币种与汇率", "新增 设置页可实时拉取 AUD→CNY 市场价，按加点计算报价并保存更新时间", "调整 顶部价格摘要显示当前汇率，今日营收显示人民币小计", "测试 汇率接口、人民币结算与 Chrome 冒烟。"] },
 ];
 // <<< APP_CHANGELOG END（自动生成，勿手改）
 
@@ -2554,6 +2561,7 @@ function switchTab(name){
   currentTab = name;
   TAB_NAMES.forEach(t => { const p = document.getElementById("pane-" + t); if (p) p.hidden = (t !== name); });
   $$("#tabs .tab").forEach(b => b.classList.toggle("on", b.dataset.tab === name));
+  syncTabSlider();
   armOffAll();
   if (name === "board") requestAnimationFrame(syncAsideHeight);
   if (name === "stats") renderStats();
@@ -2562,6 +2570,27 @@ function switchTab(name){
   else renderHistory();
 }
 $("#tabs").addEventListener("click", e => { const b = e.target.closest("[data-tab]"); if (b) switchTab(b.dataset.tab); });
+
+/* 页签滑块：跟着选中的按钮走，切换时滑过去（首屏不滑） */
+function syncTabSlider(){
+  const seg = document.getElementById("seg");
+  const slider = document.getElementById("segSlider");
+  if (!seg || !slider) return;
+  const btn = seg.querySelector(".tab.on");
+  if (!btn || !btn.offsetWidth) return;
+  slider.style.width = btn.offsetWidth + "px";
+  slider.style.transform = "translateX(" + (btn.offsetLeft - 4) + "px)";
+}
+function initTabSlider(){
+  const slider = document.getElementById("segSlider");
+  if (!slider) return;
+  slider.style.transition = "none";
+  syncTabSlider();
+  void slider.offsetWidth;
+  slider.style.transition = "";
+}
+window.addEventListener("resize", () => syncTabSlider());
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => syncTabSlider());
 
 function weekdayCn(dateStr){
   const d = new Date(String(dateStr) + "T12:00:00");
@@ -4361,6 +4390,7 @@ $("#footVer").textContent = APP_VER;
 loadLocal();
 if (!state.updatedAt) state.updatedAt = 0;
 renderAll();
+initTabSlider();
 tick();
 setInterval(tick, 1000);
 initFB();
