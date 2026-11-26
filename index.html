@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>拼豆店 · 工位看板</title>
-<meta name="app-ver" content="v0.7.0">
+<meta name="app-ver" content="v0.7.1">
 <style>
 :root{
   --bg:#f4efe6; --bg2:#fbf8f2; --card:#ffffff; --ink:#241f1a; --ink2:#4b4239; --muted:#7c7064;
@@ -576,6 +576,25 @@ table.rt select.mini-sel{padding:4px 6px;font-size:11px;border-radius:8px;backgr
 .pcard .sold-tag{position:absolute;top:9px;left:9px;font-size:9.5px;font-weight:800;color:#fff;background:var(--bad);border-radius:5px;padding:2px 5px}
 .pcard .pedit{position:absolute;right:9px;top:9px;width:24px;height:24px;border:1px solid var(--line);border-radius:8px;background:#fffdf8;color:var(--ink2);display:grid;place-items:center;font-size:12px;padding:0}
 .pcard .pedit:hover{border-color:#d9c6ad;background:#fff}
+.pico.ph{padding:0;overflow:hidden}
+.pico img{width:100%;height:100%;object-fit:cover;display:block}
+.photo-row{display:flex;align-items:center;gap:12px}
+.photo-prev{width:58px;height:58px;border-radius:12px;background:#f8f0e4;display:grid;place-items:center;overflow:hidden;font-size:22px;flex:none}
+.photo-prev img{width:100%;height:100%;object-fit:cover}
+.crop-ov{position:fixed;inset:0;z-index:260;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(35,28,22,.62);backdrop-filter:blur(4px)}
+.crop-ov.on{display:flex}
+.crop-box{background:#fff;border-radius:16px;box-shadow:0 30px 70px rgba(30,20,10,.35);width:min(360px,100%);overflow:hidden}
+.crop-h{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--line2)}
+.crop-h b{font-size:13.5px}
+.crop-x{border:0;background:none;font-size:15px;color:var(--muted);padding:2px 5px}
+.crop-stage{width:280px;height:280px;margin:14px auto 0;border-radius:12px;overflow:hidden;background:#f4efe6;touch-action:none;cursor:grab}
+.crop-stage:active{cursor:grabbing}
+.crop-stage canvas{width:280px;height:280px;display:block}
+.crop-tools{display:flex;align-items:center;gap:10px;padding:12px 16px 0}
+.crop-tools span{flex:none;font-size:11.5px;color:var(--muted);font-weight:700}
+.crop-tools input{flex:1;accent-color:var(--accent)}
+.crop-tip{font-size:11px;color:var(--muted);text-align:center;padding:8px 16px 0}
+.crop-foot{display:flex;gap:8px;justify-content:flex-end;padding:12px 16px 14px}
 .rd-empty{border:1px dashed #e7d9c7;border-radius:16px;background:linear-gradient(180deg,#fffdf9,#fbf6ee);padding:38px 20px;text-align:center}
 .rd-empty-ico{font-size:30px;line-height:1}
 .rd-empty h3{font-size:16px;margin-top:8px}
@@ -660,7 +679,7 @@ table.rt select.mini-sel{padding:4px 6px;font-size:11px;border-radius:8px;backgr
       <h1>
         <span class="beads"><i></i><i></i><i></i><i></i></span>
         拼豆店
-        <button class="ver" id="verBtn" title="更新日志">v0.7.0</button>
+        <button class="ver" id="verBtn" title="更新日志">v0.7.1</button>
       </h1>
       <div class="sub">
         <span>Zetland · 10 个工位 · 智能板 / 普通板 · 豆子不限量</span>
@@ -862,7 +881,7 @@ table.rt select.mini-sel{padding:4px 6px;font-size:11px;border-radius:8px;backgr
 
 <footer class="foot">
   <span>拼豆店 · Zetland · 10 个工位</span>
-  <span>数据每 3 秒同步 · <b id="footVer">v0.7.0</b></span>
+  <span>数据每 3 秒同步 · <b id="footVer">v0.7.1</b></span>
 </footer>
 
 <div class="modal" id="modal">
@@ -873,6 +892,17 @@ table.rt select.mini-sel{padding:4px 6px;font-size:11px;border-radius:8px;backgr
   </div>
 </div>
 <div class="toast" id="toast"></div>
+
+<!-- 商品照片裁剪：独立一层，盖在商品编辑弹窗上面 -->
+<div id="cropOverlay" class="crop-ov">
+  <div class="crop-box">
+    <div class="crop-h"><b>裁剪照片</b><button class="crop-x" id="cropClose" title="关闭">✕</button></div>
+    <div class="crop-stage" id="cropStage"><canvas id="cropCanvas" width="560" height="560"></canvas></div>
+    <div class="crop-tools"><span>缩放</span><input type="range" id="cropZoom" min="100" max="320" value="100"></div>
+    <div class="crop-tip">拖动图片调位置 · 滑杆或滚轮缩放</div>
+    <div class="crop-foot"><button class="btn" id="cropCancel">取消</button><button class="btn acc" id="cropOk">用这张</button></div>
+  </div>
+</div>
 
 <!-- ============================================================
      结算弹窗 —— 结构照搬自 天胡麻将系统/mahjong-timer.html:743-895
@@ -994,9 +1024,10 @@ const round4 = n => Math.round((+n || 0) * 10000) / 10000;
 /* Firebase：独立项目 pindoushop 下的 shops/<key>/state；REST 轮询同步 */
 const FB_URL = "https://pindoushop-default-rtdb.asia-southeast1.firebasedatabase.app/shops/pindou-b7f9a52ba498/state.json";
 const FB_VER_URL = FB_URL.replace(/\/state\.json$/, "/__sysVer.json");
-const APP_VER = "v0.7.0", APP_DATE = "2026-11-27";
+const APP_VER = "v0.7.1", APP_DATE = "2026-11-27";
 // >>> APP_CHANGELOG BEGIN（自动生成，勿手改）
 const APP_CHANGELOG = [
+  { ver: "v0.7.1", date: "2026-11-27", sum: "配件可以放照片，自己裁成小图", items: ["新增 商品照片，选图后拖动位置、滑杆或滚轮缩放，存成 200×200 JPEG 小图，卡片上直接显示", "新增 照片存进商品里，多设备同步，数据没变时用 ETag 跳过下载，加了照片也不费流量", "调整 选完照片不会清掉已经填好的名称 / 价格 / 库存（先读回再重绘）", "测试 配件冒烟 47 项、结算冒烟 27 项、页面冒烟 79 项共 153 项全绿。"] },
   { ver: "v0.7.0", date: "2026-11-27", sum: "新增配件页，可挂工位也可单独卖", items: ["新增 顶部第四个页签「配件」，商品和分类都自己加，点卡片加购、库存售罄拦截、盘点记录", "新增 结算弹窗里「＋ 加配件」，工位上挂着的配件自动带出，和其它费用一起进账单", "新增 单独结算走「配件零售」单，不占工位，支持现金 / 刷卡 / 人民币", "调整 配件库存只在落单时扣，结算扣、改单按差额补、删单归还，挂账期间不扣", "调整 统计「其它费用」里拆出「其中配件」，结算记录与今日收款认零售单", "测试 新增配件冒烟 41 项，连同结算 27 项、页面 79 项共 147 项全绿。"] },
   { ver: "v0.6.6", date: "2026-11-27", sum: "工位卡不再逐个显示价格", items: ["调整 空工位的「智能板 / 普通板」按钮去掉单价，只留板型名，价格统一看顶部价格摘要", "调整 两个按钮改成单行居中、稍高一点，去掉为放价格留的竖排布局", "移除 不再使用的 `priceLabel()` 函数", "测试 结算冒烟 27 项与页面冒烟 77 项回归通过。"] },
   { ver: "v0.6.5", date: "2026-11-27", sum: "所有输入框统一成暖色手作样式", items: ["调整 全站输入框与下拉统一为一套外观，暖白底、10px 圆角、细边、聚焦时橙色描边加光晕", "调整 结算记录搜索、员工姓名、工资周期、统计日期与打卡班次下拉这些原来是浏览器默认样式，现在跟工位卡同一套语言", "调整 日期 / 周 / 月选择器给定合理宽度，不再缩成一团", "弹窗里的输入框也换成同一底色与聚焦环", "测试 页面冒烟 77 项与结算冒烟 27 项回归通过。"] },
@@ -1011,7 +1042,6 @@ const APP_CHANGELOG = [
   { ver: "v0.3.2", date: "2026-11-24", sum: "新增人民币收款与实时汇率", items: ["新增 结算支持人民币收款，按设置汇率把澳币应收折算成人民币，记录中保存币种与汇率", "新增 设置页可实时拉取 AUD→CNY 市场价，按加点计算报价并保存更新时间", "调整 顶部价格摘要显示当前汇率，今日营收显示人民币小计", "测试 汇率接口、人民币结算与 Chrome 冒烟。"] },
   { ver: "v0.3.1", date: "2026-11-24", sum: "调整顶部与统计卡间距", items: ["调整 顶部卡片上边距从 20px 到 28px，移动端为 18px", "调整 顶部卡片与统计卡之间增加 22px 间距", "修复 顶部卡片与内容区左右未对齐", "测试 桌面与移动端截图检查。"] },
   { ver: "v0.3.0", date: "2026-11-24", sum: "整体界面视觉改版", items: ["调整 顶部栏、统计卡、工位卡、收款列表、弹窗统一为暖色手作风格", "新增 统计卡图标、工位板型价签、收款方式标签与页脚", "优化 运行中、暂停工位增加状态色条与悬停反馈", "测试 Chrome 冒烟、更新日志生成与移动端截图。"] },
-  { ver: "v0.2.3", date: "2026-11-24", sum: "更新日志改为手风琴并统一规范", items: ["调整 更新日志唯一来源改为 README 的「最近 15 个版本」表格，由 `生成更新日志.py` 注入页面", "新增 弹窗默认收起，一行显示版本、日期、条数、摘要，点一行展开详情", "调整 详情按「新增、调整、修复、移除、优化、测试」开头，摘要不超过 28 字", "新增 发布体检校验页面内嵌日志与 README 是否同步。"] },
 ];
 // <<< APP_CHANGELOG END（自动生成，勿手改）
 
@@ -1029,7 +1059,7 @@ function freshSeat(i){
           endedAt:0, carry:0, cart:[]};
 }
 function freshItem(){
-  return {id:"", name:"", cat:"", price:0, stock:0, low:3, note:"", sort:0};
+  return {id:"", name:"", cat:"", price:0, stock:0, low:3, note:"", photo:"", sort:0};
 }
 function freshState(){
   return {
@@ -1115,6 +1145,7 @@ function normalize(v){
     id: String(x.id || nextId()), name: String(x.name), cat: String(x.cat || ""),
     price: round2(+x.price || 0), stock: Math.max(0, Math.round(+x.stock || 0)),
     low: Math.max(0, Math.round(+x.low != null ? +x.low : 3)), note: String(x.note || ""),
+    photo: (typeof x.photo === "string" && x.photo.length > 0 && x.photo.length < 400000) ? x.photo : "",
     sort: +x.sort || i
   })) : [];
   base.stockLogs = Array.isArray(v.stockLogs) ? v.stockLogs.filter(x => x && x.name).slice(0, 300) : [];
@@ -1132,6 +1163,7 @@ let rdEditMode = false;
 let rdSeatSel = 1;
 let rdDelArm = "", rdDelTimer = null;
 let settleExtras = [];          // 当前结算弹窗里的配件 [{id,name,price,qty}]
+let itemPhotoCb = null;         // 商品编辑弹窗当前的照片回调
 
 function loadLocal(){
   try {
@@ -3564,15 +3596,23 @@ async function pushNow(){
     const payload = JSON.parse(JSON.stringify(state));
     const r = await fetch(FB_URL, {method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload), cache:"no-store"});
     if (!r.ok) throw new Error("HTTP " + r.status);
+    stateEtag = "";
     setSync("已同步", true);
   } catch (e){ setSync("本地", false); }
   finally { pushing = false; }
 }
+let stateEtag = "";      // 数据没变时让 Firebase 回 304，省流量（照片不小）
 async function pullNow(){
   if (!FB_URL || pushing) return;
   try {
-    const r = await fetch(FB_URL, {cache:"no-store"});
+    const headers = {};
+    if (stateEtag) headers["If-None-Match"] = stateEtag;
+    else headers["X-Firebase-ETag"] = "true";
+    const r = await fetch(FB_URL, {cache:"no-store", headers: headers});
+    if (r.status === 304){ setSync("已同步", true); return; }
     if (!r.ok) throw new Error("HTTP " + r.status);
+    const et = r.headers.get("ETag");
+    if (et) stateEtag = et;
     const v = await r.json();
     if (!v || !v.updatedAt){
       if ((+state.updatedAt || 0) > 0) queuePush();
@@ -3681,7 +3721,7 @@ function itemCardHtml(it){
     corner = '<button class="padd" data-radd="' + esc(it.id) + '" title="加一件">＋</button>';
   }
   return '<div class="pcard' + (q > 0 && !rdEditMode ? " on" : "") + (sold ? " soldout" : "") + '" data-rid="' + esc(it.id) + '">' +
-    '<div class="pico">' + esc(catEmoji(it.cat)) + '</div>' +
+    '<div class="pico' + (it.photo ? " ph" : "") + '">' + (it.photo ? '<img src="' + esc(it.photo) + '" alt="">' : esc(catEmoji(it.cat))) + '</div>' +
     '<div class="pname" title="' + esc(it.name) + '">' + esc(it.name) + '</div>' +
     '<div class="pfoot"><b>' + money(it.price) + '</b><span class="pstock ' + (sold ? "out" : low ? "low" : "") + '">' +
       (sold ? "售罄" : "库存 " + stock) + '</span></div>' + corner + '</div>';
@@ -3964,6 +4004,108 @@ function openAccPickModal(){
   }, true);
 }
 
+/* ---------- 商品照片裁剪 ---------- */
+const CROP = {im:null, cw:0, ch:0, base:1, zoom:1, x:0, y:0, cb:null, drag:false, sx:0, sy:0, ox:0, oy:0};
+const CROP_SIZE = 280;
+const cropCanvas = document.getElementById("cropCanvas");
+const cropCtx = cropCanvas.getContext("2d");
+
+function cropClamp(){
+  const sc = CROP.base * CROP.zoom;
+  const w = CROP.cw * sc, h = CROP.ch * sc;
+  const mx = Math.max(0, (w - CROP_SIZE) / 2), my = Math.max(0, (h - CROP_SIZE) / 2);
+  CROP.x = Math.max(-mx, Math.min(mx, CROP.x));
+  CROP.y = Math.max(-my, Math.min(my, CROP.y));
+}
+function cropDraw(){
+  if (!CROP.im) return;
+  const ctx = cropCtx;
+  ctx.setTransform(2, 0, 0, 2, 0, 0);       // canvas 内部 560，按 280 坐标画
+  ctx.fillStyle = "#f4efe6";
+  ctx.fillRect(0, 0, CROP_SIZE, CROP_SIZE);
+  const sc = CROP.base * CROP.zoom;
+  const w = CROP.cw * sc, h = CROP.ch * sc;
+  const left = CROP_SIZE / 2 - w / 2 + CROP.x;
+  const top = CROP_SIZE / 2 - h / 2 + CROP.y;
+  ctx.drawImage(CROP.im, left, top, w, h);
+  ctx.strokeStyle = "rgba(255,255,255,.9)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(0, 0, CROP_SIZE, CROP_SIZE);
+}
+function cropClose(){
+  document.getElementById("cropOverlay").classList.remove("on");
+  CROP.im = null; CROP.cb = null; CROP.drag = false;
+}
+function openCropper(file, cb){
+  const url = URL.createObjectURL(file);
+  const im = new Image();
+  im.onload = () => {
+    CROP.im = im; CROP.cw = im.width; CROP.ch = im.height;
+    CROP.base = Math.max(CROP_SIZE / im.width, CROP_SIZE / im.height);
+    CROP.zoom = 1; CROP.x = 0; CROP.y = 0; CROP.cb = cb; CROP.drag = false;
+    const z = document.getElementById("cropZoom");
+    if (z) z.value = 100;
+    document.getElementById("cropOverlay").classList.add("on");
+    cropDraw();
+  };
+  im.onerror = () => { URL.revokeObjectURL(url); toast("这张图片打不开，换一张 JPG / PNG 试试"); };
+  im.src = url;
+}
+(function(){
+  const stage = document.getElementById("cropStage");
+  if (!stage) return;
+  stage.addEventListener("pointerdown", e => {
+    if (!CROP.im) return;
+    CROP.drag = true; CROP.sx = e.clientX; CROP.sy = e.clientY; CROP.ox = CROP.x; CROP.oy = CROP.y;
+    try { stage.setPointerCapture(e.pointerId); } catch (err){}
+  });
+  stage.addEventListener("pointermove", e => {
+    if (!CROP.drag) return;
+    CROP.x = CROP.ox + (e.clientX - CROP.sx);
+    CROP.y = CROP.oy + (e.clientY - CROP.sy);
+    cropClamp(); cropDraw();
+  });
+  ["pointerup", "pointercancel"].forEach(t => stage.addEventListener(t, () => { CROP.drag = false; }));
+  stage.addEventListener("wheel", e => {
+    e.preventDefault();
+    const z = document.getElementById("cropZoom");
+    z.value = Math.max(100, Math.min(320, Number(z.value) + (e.deltaY < 0 ? 12 : -12)));
+    CROP.zoom = Number(z.value) / 100;
+    cropClamp(); cropDraw();
+  }, { passive: false });
+  document.getElementById("cropZoom").addEventListener("input", e => {
+    CROP.zoom = Number(e.target.value) / 100;
+    cropClamp(); cropDraw();
+  });
+  document.getElementById("cropCancel").addEventListener("click", cropClose);
+  document.getElementById("cropClose").addEventListener("click", cropClose);
+  document.getElementById("cropOk").addEventListener("click", () => {
+    if (!CROP.im || !CROP.cb) return;
+    const sc = CROP.base * CROP.zoom;
+    const w = CROP.cw * sc, h = CROP.ch * sc;
+    const left = CROP_SIZE / 2 - w / 2 + CROP.x;
+    const top = CROP_SIZE / 2 - h / 2 + CROP.y;
+    const k = 200 / CROP_SIZE;
+    const out = document.createElement("canvas");
+    out.width = 200; out.height = 200;
+    const ctx = out.getContext("2d");
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, 200, 200);
+    ctx.drawImage(CROP.im, left * k, top * k, w * k, h * k);
+    let data = "";
+    try { data = out.toDataURL("image/jpeg", 0.82); } catch (err){ toast("这张图存不下来，换一张试试"); return; }
+    const cb = CROP.cb;
+    cropClose();
+    if (cb) cb(data);
+  });
+})();
+$("#mBody").addEventListener("change", e => {
+  if (e.target.id !== "itPhotoFile") return;
+  const f = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if (f && itemPhotoCb) itemPhotoCb(f);
+});
+
 /* ---------- 商品 / 分类 / 盘点记录 ---------- */
 function openItemModal(item){
   const isNew = !item;
@@ -3971,11 +4113,32 @@ function openItemModal(item){
   let catSel = it.cat || "";
   let newCatOpen = false;
   let delArm = false;
+  /* 从弹窗输入框读回 it（照片回调会重建弹窗，得先把已填的内容读回来） */
+  const read = () => {
+    if ($("#itName")) it.name = $("#itName").value.trim();
+    if ($("#itCat")) it.cat = $("#itCat").value || "";
+    if ($("#itPrice")) it.price = round2(parseFloat($("#itPrice").value) || 0);
+    if ($("#itStock")) it.stock = Math.max(0, Math.round(parseFloat($("#itStock").value) || 0));
+    if ($("#itLow")) it.low = Math.max(0, Math.round(parseFloat($("#itLow").value) || 0));
+    if ($("#itNote")) it.note = $("#itNote").value.trim();
+  };
+  itemPhotoCb = f => openCropper(f, data => { read(); it.photo = data; build(); });
   const build = () => {
     const opts = '<option value="">未分类</option>' + state.cats.map(c =>
       '<option value="' + esc(c.id) + '"' + (catSel === c.id ? " selected" : "") + '>' + esc(c.name) + '</option>').join("");
     $("#mBody").innerHTML =
       '<div class="field"><label>商品名</label><input class="input" id="itName" value="' + esc(it.name) + '" placeholder="比如：镊子 / 钥匙扣配件 / 单色豆 1000 粒"></div>' +
+      '<div class="field"><label>照片（可不放）</label>' +
+        '<div class="photo-row">' +
+          '<div class="photo-prev">' + (it.photo ? '<img src="' + esc(it.photo) + '" alt="">' : '<span>' + esc(catEmoji(it.cat)) + '</span>') + '</div>' +
+          '<div style="display:flex;flex-direction:column;gap:6px">' +
+            '<button class="btn sm" data-act="pickphoto">' + (it.photo ? "换一张" : "选择照片") + '</button>' +
+            (it.photo ? '<button class="btn sm ghost" data-act="clearphoto">去掉照片</button>' : '') +
+          '</div>' +
+        '</div>' +
+        '<div class="hint" style="margin-top:6px">选完可以拖动位置、滑杆缩放，存成 200×200 小图</div>' +
+        '<input type="file" id="itPhotoFile" accept="image/*" style="display:none">' +
+      '</div>' +
       '<div class="field"><label>分类</label><div style="display:flex;gap:8px;align-items:center">' +
         '<select class="input" id="itCat" style="flex:1">' + opts + '</select>' +
         '<button class="btn sm" data-act="newcat">＋ 新分类</button></div>' +
@@ -3992,15 +4155,13 @@ function openItemModal(item){
   openModal(isNew ? "新增商品" : "编辑商品", build, e => {
     const act = e.target.closest("[data-act]"); if (!act) return;
     const a = act.dataset.act;
-    const read = () => {
-      it.name = ($("#itName") ? $("#itName").value : "").trim();
-      it.cat = ($("#itCat") ? $("#itCat").value : "") || "";
-      it.price = round2(parseFloat($("#itPrice") ? $("#itPrice").value : 0) || 0);
-      it.stock = Math.max(0, Math.round(parseFloat($("#itStock") ? $("#itStock").value : 0) || 0));
-      it.low = Math.max(0, Math.round(parseFloat($("#itLow") ? $("#itLow").value : 0) || 0));
-      it.note = ($("#itNote") ? $("#itNote").value : "").trim();
-    };
     if (a === "cancel"){ closeModal(); return; }
+    if (a === "pickphoto"){
+      const f = document.getElementById("itPhotoFile");
+      if (f) f.click();
+      return;
+    }
+    if (a === "clearphoto"){ it.photo = ""; build(); return; }
     if (a === "newcat"){ read(); newCatOpen = !newCatOpen; build(); return; }
     if (a === "addcat"){
       const name = ($("#itNewCat") ? $("#itNewCat").value : "").trim();
