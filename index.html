@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>拼豆店 · 工位看板</title>
-<meta name="app-ver" content="v0.3.2">
+<meta name="app-ver" content="v0.7.0">
 <style>
 :root{
   --bg:#f4efe6; --bg2:#fbf8f2; --card:#ffffff; --ink:#241f1a; --ink2:#4b4239; --muted:#7c7064;
@@ -115,6 +115,13 @@ aside{display:flex;flex-direction:column;gap:12px;position:sticky;top:12px}
 .panel-h h3{font-size:13px}
 .panel-h .count{font-size:10.5px;color:var(--muted);font-weight:700}
 .panel-b{padding:11px 13px}
+/* ★ 侧栏和左边工位区等高：由 JS 把面板 max-height 卡在工位区高度上，
+   多出来的记录在面板里滚动（不再用 grid stretch —— 那会被记录条数反过来撑高整列） */
+aside>.panel{display:flex;flex-direction:column;min-height:0}
+aside>.panel>.panel-b{flex:1 1 auto;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch}
+/* 内容超出时底部渐隐，暗示还能滑动（够长时不加） */
+aside>.panel>.panel-b.has-more{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 22px),transparent);
+  mask-image:linear-gradient(to bottom,#000 calc(100% - 22px),transparent)}
 .rec-item{display:flex;justify-content:space-between;gap:8px;font-size:11px;padding:6px 0;border-bottom:1px dashed var(--line2)}
 .rec-item:last-child{border-bottom:0}
 .rec-item .l{color:var(--muted)}
@@ -179,7 +186,9 @@ aside{display:flex;flex-direction:column;gap:12px;position:sticky;top:12px}
 .payopt.on{background:var(--ink);color:#fff;border-color:var(--ink)}
 .setgrid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
 .setgrid .field{margin:0}
-.input{width:100%;border:1px solid var(--line);border-radius:9px;padding:8px 10px;font-size:12.5px;font-family:var(--mono);background:#fff}
+.input{width:100%;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12.5px;
+  font-family:var(--mono);background:#fffdf8;color:var(--ink);transition:.12s}
+.input:focus{outline:none;border-color:#e0b48a;background:#fff;box-shadow:0 0 0 3px rgba(226,96,47,.10)}
 .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#241f1a;color:#fff;padding:9px 14px;border-radius:10px;font-size:12px;z-index:300;opacity:0;transition:.2s;pointer-events:none;max-width:80vw;text-align:center}
 .toast.on{opacity:1}
 
@@ -248,7 +257,8 @@ body{
 .seat .badge{font-size:9px;padding:2px 7px}
 .seat.running .badge:before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:#e2602f;margin-right:2px;animation:pulse 1.4s infinite}
 .idle-pick{gap:6px}
-.idle-pick .btn{padding:7px 8px;font-size:11px;line-height:1.18;flex:1;display:flex;flex-direction:column;align-items:flex-start;gap:1px;border-radius:9px;min-width:0}
+.idle-pick .btn{padding:9px 8px;font-size:11.5px;font-weight:800;line-height:1.18;flex:1;
+  display:flex;align-items:center;justify-content:center;border-radius:9px;min-width:0;letter-spacing:.01em}
 .idle-pick .btn small{font-family:var(--mono);font-size:9px;font-weight:600;opacity:.72;letter-spacing:-.02em}
 .idle-pick .btn.acc{box-shadow:0 6px 14px rgba(226,96,47,.18)}
 .seat .acts .btn{padding:6px 6px;border-radius:8px}
@@ -300,6 +310,346 @@ body{
   .foot{padding-bottom:22px}
 }
 @media(max-width:820px){.top-wrap{padding-top:18px}main.wrap{padding:18px 0 40px}.summary{margin-bottom:14px}}
+
+/* ============================================================
+   结算弹窗 —— 样式照搬自 天胡麻将系统/app.css:406-440 / 2151-2250 / 2700-2770
+   只把天胡的色值令牌（--green/--c-surface-2/--muted/--line）映射到拼豆令牌
+   ============================================================ */
+#settleOverlay{position:fixed;inset:0;z-index:210;display:none;align-items:center;justify-content:center;
+  padding:18px;background:rgba(35,28,22,.52);backdrop-filter:blur(3px)}
+#settleOverlay.on{display:flex}
+#settleModal{background:#fff;border-radius:18px;padding:26px;width:min(94vw,480px);max-height:92vh;overflow:auto;
+  text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.3);animation:pop .16s ease-out;position:relative}
+#settleModal h3{font-size:18px;margin-bottom:14px}
+#settleModal .rows{text-align:left;font-size:13px;color:var(--muted);margin:14px 0;line-height:1.9}
+#settleModal .rows b{color:var(--ink)}
+#settleModal .divider{height:1px;background:var(--line2);margin:12px 0}
+#settleModal .hint{font-size:11.5px;color:var(--muted);text-align:left;margin:6px 0 10px;line-height:1.6}
+#settleModal .error{color:var(--bad);font-size:12px;margin:6px 0;text-align:left;font-weight:700}
+#settleModal .warn-note{color:#b45309;font-weight:700}
+#settleModal .field{text-align:left;margin-bottom:11px}
+#settleModal .field label{display:block;font-size:11px;font-weight:750;color:var(--muted);margin-bottom:5px}
+#settleModal .field input[type=number],#settleModal .field input[type=text],
+#settleModal .field input[type=date],#settleModal .field select{width:100%;border:1px solid var(--line);
+  border-radius:9px;padding:8px 10px;font-size:12.5px;background:#fff;font-family:inherit}
+#settleModal .time-input{width:78px;padding:8px;border:1px solid var(--line);border-radius:9px;font-size:12.5px;text-align:center;font-family:var(--mono)}
+#settleModal .rmb-line{background:#fff3cd;border:1px solid #e5c37e;border-radius:10px;padding:10px 12px;
+  font-size:12.5px;margin:10px 0;color:#8a5a00;text-align:left;line-height:1.7}
+#settleModal .rmb-line b{font-size:17px;color:#8a5a00}
+#settleModal .modal-btns{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+#settleModal .modal-btns button{width:100%}
+#settleModal .btn-settle{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:12px;
+  font-size:15px;font-weight:800;transition:.12s}
+#settleModal .btn-settle:hover{background:#c9501f}
+#settleModal .btn-ghost{background:#fff;border:1px solid var(--line);color:var(--ink2);border-radius:10px;
+  padding:9px 12px;font-size:12.5px;font-weight:700}
+#settleModal .btn-ghost:hover{background:var(--line2)}
+#settleModal .btn-ghost.sm{padding:6px 9px;font-size:11.5px;border-radius:8px;width:auto}
+#settleModal .mini{width:auto;padding:6px 9px;font-size:12px;background:var(--bg2);border:1px solid var(--line);
+  border-radius:8px;color:var(--muted);font-weight:800;line-height:1}
+#settleModal .mini:hover{background:#f6efe3;color:var(--ink)}
+/* 收款明细行（天胡 app.css:2221-2243） */
+#settleModal .cart-row{display:flex;align-items:center;gap:8px;border-bottom:none}
+#settleModal .cart-row.pay-head{padding:8px 0 2px}
+#settleModal .pay-head .ph-label{min-width:18px;font-size:12.5px;font-weight:700;color:var(--muted);text-align:left}
+#settleModal .pay-head input.ph-amount{width:96px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;
+  text-align:right;font-size:13.5px;font-family:var(--mono);font-weight:700}
+#settleModal .pay-head .part-due{margin-left:auto;font-weight:800;font-family:var(--mono);font-size:13px}
+#settleModal .cart-row.pay-method{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:2px 0 6px}
+#settleModal .cart-row.pay-detail{display:flex;align-items:center;gap:6px 8px;flex-wrap:wrap;
+  padding:2px 0 8px;border-bottom:1px dashed var(--line)}
+#settleModal .pay-pick{font-family:inherit;cursor:pointer;font-size:11.5px;font-weight:750;border-radius:999px;
+  padding:6px 10px;min-height:30px;border:1px solid #e3e8e5;background:#fff;color:var(--muted)}
+#settleModal .pay-pick.on{border-color:var(--teal);background:var(--teal);color:#fff}
+#settleModal .pay-pick.ch-wx.on{border-color:#07C160;background:#07C160;color:#fff}
+#settleModal .pay-pick.ch-ali.on{border-color:#1677FF;background:#1677FF;color:#fff}
+#settleModal .pay-pick.ch-wx:not(.on){color:#07a04f;border-color:#a7e3c3}
+#settleModal .pay-pick.ch-ali:not(.on){color:#1677FF;border-color:#a9c8ff}
+#settleModal .pm-k{font-size:11.5px;color:var(--muted);font-weight:700}
+/* 吸底（天胡 app.css:2707-2723） */
+#settleModal .settle-foot{position:sticky;bottom:-26px;z-index:6;margin:10px -26px -26px;
+  padding:10px 26px 18px;background:#fff;border-top:1px solid var(--line);
+  box-shadow:0 -10px 22px rgba(50,35,20,.08);border-radius:0 0 18px 18px;text-align:center}
+#settleModal .settle-foot .sf-k{font-size:12.5px;font-weight:750;color:var(--muted);letter-spacing:.3px}
+#settleModal .settle-foot .big{font-size:34px;margin:0;line-height:1.15;font-family:var(--mono);font-weight:800;color:var(--ink)}
+#settleModal .settle-foot .sf-sub{font-size:12px;color:var(--muted);line-height:1.5}
+#settleModal .settle-foot .modal-btns{margin-top:9px}
+#settleModal .settle-left,#settleModal .settle-right{display:contents}
+@media(min-width:860px) and (min-height:560px){
+  #settleOverlay #settleModal{display:flex;align-items:stretch;text-align:left;width:min(94vw,1000px);padding:0;overflow:hidden}
+  #settleModal .settle-left{display:block;flex:1 1 auto;min-width:0;overflow-y:auto;padding:22px 22px 20px 26px;text-align:center}
+  #settleModal .settle-right{display:flex;flex-direction:column;flex:0 0 44%;min-width:350px;max-width:460px;
+    overflow:hidden;padding:22px 26px 0 20px;border-left:1px solid var(--line);background:var(--bg2)}
+  #settleModal .settle-right #sSplitWrap{flex:0 1 auto;min-height:0;overflow-y:auto;margin-bottom:0;padding-right:4px}
+  #settleModal .settle-foot{position:static;flex:0 0 auto;margin:10px -26px 0 -20px;padding:10px 26px 14px 20px;
+    border-radius:0;box-shadow:none;background:#fff}
+  #settleModal .settle-foot .modal-btns{flex-direction:row}
+  #settleModal .settle-foot .modal-btns button{flex:1 1 0;width:auto}
+  #settleModal .settle-left .field,#settleModal .settle-left #sEditTime{text-align:left}
+}
+@media(max-width:640px){
+  #settleModal{padding:16px}
+  #settleModal .settle-foot{bottom:-16px;margin:8px -16px -16px;padding:8px 16px 14px}
+  #settleModal .settle-foot .big{font-size:28px}
+  #settleModal .cart-row.pay-head{display:grid;grid-template-columns:auto minmax(72px,92px) minmax(0,1fr) auto;gap:6px 8px;align-items:center}
+  #settleModal .pay-head .part-due{margin-left:0;justify-self:end}
+}
+/* 待结算工位卡（天胡 .table.ended） */
+.seat.ended{border-color:#e3c98f;background:linear-gradient(180deg,#fff,#fffaf0)}
+.seat.ended .timer{color:#8a6512}
+.seat .carry-tip{font-size:10px;font-weight:750;color:#b45309;margin-top:2px}
+
+/* ============================================================
+   页签 + 统计页 + 员工页（结构照搬自 天胡麻将系统：
+   mahjong-timer.html:80-85 页签、:388-456 员工、:457-489 统计）
+   ============================================================ */
+.tabs{display:flex;gap:6px;width:100%;max-width:1280px;margin:14px auto 0;padding:0 22px;flex-wrap:wrap}
+@media(max-width:560px){.tabs{padding:0 14px}}
+.tab{border:1px solid var(--line);background:#fff;border-radius:11px;padding:8px 15px;font-size:12.5px;font-weight:800;
+  color:var(--muted);display:inline-flex;align-items:center;gap:6px;transition:.12s}
+.tab:hover{color:var(--ink);border-color:#cfc3b1}
+.tab.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.tab .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);display:none}
+.tab.on .dot{display:inline-block}
+[hidden]{display:none !important}
+
+/* 侧栏今日收款：全部列出、面板内滚动（原来只显示 8 条，多了看不到） */
+#records{overflow:visible}
+@media(max-width:1100px){#records{max-height:430px;overflow:auto}}
+
+/* 统计卡片 */
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+.cards.hero{grid-template-columns:1fr}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;box-shadow:var(--shadow)}
+.card .cl{font-size:11px;color:var(--muted);font-weight:750;letter-spacing:.03em}
+.card .cv{font-family:var(--mono);font-size:21px;font-weight:800;letter-spacing:-.02em;margin-top:2px}
+.card .cs{font-size:10.5px;color:var(--muted);margin-top:1px;line-height:1.5}
+.card.main{background:linear-gradient(135deg,#3a2b22,#241f1a);color:#fff;border:none;grid-column:span 2}
+/* 7 张卡：主卡占 2 格 → 第一排 主卡+台费+其它，第二排 手续费+人民币+客单+计时，正好两排满 */
+.card.main .cl{color:#cbbaa7}.card.main .cv{font-size:30px;color:#fff}.card.main .cs{color:#b9a897}
+@media(max-width:820px){.cards{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.cards{grid-template-columns:repeat(2,1fr)}}
+
+/* ============================================================
+   统一表单控件：所有输入框 / 下拉走同一套外观（暖白底、圆角 10、橙色聚焦环）
+   带 .input 的（弹窗里的）保持自己那套；结算弹窗用 #settleModal 作用域的单独样式
+   ============================================================ */
+input[type=text]:not(.input):not(.pay-pick):not(.tinput),
+input[type=number]:not(.input):not(.tinput),
+input[type=date]:not(.input):not(.tinput),
+input[type=week]:not(.input),
+input[type=month]:not(.input),
+input[type=time]:not(.input),
+select:not(.input){
+  border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12.5px;font-family:inherit;
+  color:var(--ink);background:#fffdf8;transition:.12s;max-width:100%;line-height:1.3;
+  box-shadow:inset 0 1px 2px rgba(50,35,20,.03);
+}
+input[type=text]:not(.input):not(.tinput):hover,input[type=number]:not(.input):not(.tinput):hover,
+input[type=date]:not(.input):hover,input[type=week]:not(.input):hover,
+input[type=month]:not(.input):hover,select:not(.input):hover{border-color:#d8c9b6;background:#fff}
+input[type=text]:not(.input):not(.tinput):focus,input[type=number]:not(.input):not(.tinput):focus,
+input[type=date]:not(.input):focus,input[type=week]:not(.input):focus,
+input[type=month]:not(.input):focus,select:not(.input):focus{
+  outline:none;border-color:#e0b48a;background:#fff;box-shadow:0 0 0 3px rgba(226,96,47,.10);
+}
+input::placeholder{color:#b9ada0}
+/* 表头里的小输入框（搜索 / 姓名 / 周期） */
+.ctl{width:auto;min-width:0}
+.hist-head .ctl.w160{width:160px}
+.hist-head .ctl.w140{width:140px}
+.hist-head .ctl.w120{width:120px}
+
+/* 工具栏 */
+.toolbar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+.toolbar input[type=date]{width:150px}
+.toolbar input[type=week]{width:176px}
+.toolbar input[type=month]{width:150px}
+.scope{display:inline-flex;gap:5px}
+
+/* 预估营业额通栏（天胡 app.css .est-band） */
+.est-band{display:flex;flex-wrap:wrap;align-items:center;gap:14px;background:#fdf6ec;border:1px solid #efdcc2;
+  border-radius:12px;padding:10px 14px;margin-bottom:12px}
+.est-band .k{font-size:11px;color:var(--muted);font-weight:750}
+.est-band .v{font-family:var(--mono);font-size:20px;font-weight:800}
+.est-band .parts{font-size:12px;color:var(--ink2);display:flex;flex-wrap:wrap;gap:5px 12px;align-items:center}
+
+/* 明细 / 记录表（天胡 .history / .txn-grp） */
+.hist{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin-top:14px}
+.hist-head{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:11px 13px;border-bottom:1px solid var(--line2);background:#fdfaf5}
+.hist-head h3{font-size:13px}
+.hist-scroll{max-height:520px;overflow:auto;-webkit-overflow-scrolling:touch}
+table.rt{width:100%;border-collapse:collapse;font-size:11.5px;font-variant-numeric:tabular-nums}
+table.rt th{position:sticky;top:0;background:#fbf6ee;color:var(--muted);font-size:10.5px;font-weight:800;
+  text-align:left;padding:7px 9px;border-bottom:1px solid var(--line);white-space:nowrap;z-index:1}
+table.rt td{padding:7px 9px;border-bottom:1px solid var(--line2);white-space:nowrap}
+table.rt tbody tr:hover{background:#fdf9f2;cursor:pointer}
+table.rt tr.grp td{background:#fdf3e6;font-weight:800;color:var(--ink2);cursor:default}
+table.rt tr.grp:hover{background:#fdf3e6}
+table.rt .num{text-align:right;font-family:var(--mono)}
+.chip{display:inline-block;font-size:10px;font-weight:800;padding:1px 6px;border-radius:5px;background:#f2ece2;color:var(--ink2);white-space:nowrap}
+.chip.cash{background:#e7f3ec;color:#2f7a4f}.chip.card{background:#e6edf7;color:#2b5686}
+.chip.rmb{background:#fdeee2;color:#a2461b}.chip.mixed{background:#efe9f7;color:#5b3f8a}
+.pager{display:flex;align-items:center;gap:8px;justify-content:center;padding:9px;font-size:11.5px;color:var(--muted)}
+.empty{padding:22px;text-align:center;color:var(--muted);font-size:12px}
+
+/* 员工页：卡片沿用拼豆自己的手作风（和工位卡同一套边框/阴影/圆角，
+   在班 = 和「计时中」同一套暖色高亮，主按钮用拼豆的橙色强调色） */
+.staff-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(226px,1fr));gap:10px}
+.emp{position:relative;background:linear-gradient(180deg,#fffefa 0%,#fff 60%);border:1px solid #eadfd1;
+  border-radius:16px;padding:12px 13px;display:flex;flex-direction:column;gap:9px;transition:.15s;
+  box-shadow:0 1px 2px rgba(50,35,20,.03)}
+.emp:hover{transform:translateY(-2px);box-shadow:0 12px 26px rgba(50,35,20,.09)}
+.emp.on{border-color:#f0b499;background:linear-gradient(180deg,#fff 0%,#fff8f4 100%)}
+.emp .top{display:flex;align-items:center;gap:10px}
+.emp .av{width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;
+  color:#fff;font-size:14px;font-weight:850;flex:none;box-shadow:0 2px 8px rgba(50,35,20,.14)}
+.emp .who{flex:1;min-width:0}
+.emp .nm{font-size:14px;font-weight:850;letter-spacing:-.01em;line-height:1.25;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.emp .st{font-size:11px;color:var(--muted);margin-top:2px;display:flex;align-items:center;gap:4px}
+.emp .st i{width:6px;height:6px;border-radius:50%;background:#cbbda9;display:inline-block;flex:none}
+.emp .st.on{color:#b34518;font-weight:800}
+.emp .st.on i{background:var(--accent);box-shadow:0 0 0 3px rgba(226,96,47,.14)}
+.emp .pencil{width:26px;height:26px;padding:0;border-radius:9px;border:1px solid var(--line);color:#a2937f;
+  background:#fffdf9;display:inline-flex;align-items:center;justify-content:center;font-size:12px;flex:none;transition:.12s}
+.emp .pencil:hover{color:var(--ink);border-color:#d8c9b6;background:#fff}
+/* 开始时间：虚线圈一行，和空工位的虚线呼应 */
+.emp .tline{display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px dashed var(--line);
+  border-radius:10px;background:#fffdf8;transition:.12s}
+.emp .tline:focus-within{border-style:solid;border-color:#e0b48a;background:#fff;box-shadow:0 0 0 3px rgba(226,96,47,.08)}
+.emp.on .tline{border-style:solid;border-color:#f0d9b5;background:#fffbf3}
+.emp .tline .tlabel{font-size:11px;color:var(--muted);font-weight:750;letter-spacing:.02em;flex:none}
+.emp .tinput{flex:1;min-width:0;border:0;background:transparent;padding:0;font-family:var(--mono);
+  font-size:13px;font-weight:800;text-align:right;color:var(--ink);outline:none}
+.emp .tinput::placeholder{color:#c3b6a6;font-family:var(--sans);font-weight:650;font-size:11.5px}
+.emp .tval{flex:1;text-align:right;font-family:var(--mono);font-size:13px;font-weight:800;color:#b34518}
+.emp .act{width:100%;border-radius:11px;padding:9px;font-size:12.5px;font-weight:800;transition:.12s;border:1px solid transparent}
+.emp .act.in{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 8px 18px rgba(226,96,47,.22)}
+.emp .act.in:hover{background:#c9501f;transform:translateY(-1px)}
+.emp .act.in:active{transform:none}
+.emp .act.out{background:#fbf3e4;border-color:#e6d3a8;color:#8a6512}
+.emp .act.out:hover{background:#f8ecd4}
+.emp .del{align-self:flex-end;background:none;border:0;color:#a99a8a;font-size:11px;font-weight:750;
+  padding:2px 5px;border-radius:7px;transition:.12s}
+.emp .del:hover{color:var(--bad);background:#fdf0ee}
+.emp .del[data-arm="1"]{color:#fff;background:var(--bad);padding:2px 8px}
+/* 表格里的小号下拉 */
+table.rt select.mini-sel{padding:4px 6px;font-size:11px;border-radius:8px;background:#fffdf8}
+.wagebox{margin-top:14px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;font-size:12px;color:var(--ink2)}
+.wagebox input{font-family:var(--mono);font-weight:700;text-align:right}
+.wagebox .w74{width:74px}.wagebox .w64{width:64px}.wagebox .w86{width:86px}
+.wagebox .t{font-size:11.5px;color:var(--muted)}
+/* ===== 配件页（零售） ===== */
+.grow{flex:1}
+.rd-top{margin-bottom:12px}
+.rd-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rd-bar .ctl{width:168px}
+.rd-cats{display:flex;gap:4px;flex-wrap:wrap}
+.rd-cat{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 11px;font-size:11.5px;font-weight:700;color:var(--ink2);transition:.12s}
+.rd-cat:hover{border-color:#d9c6ad}
+.rd-cat.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.rd-cat .n{font-family:var(--mono);font-size:9.5px;opacity:.65;margin-left:5px}
+.rd-low{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:10px;background:#fff8e6;border:1px solid #efd9a8;border-radius:10px;padding:8px 11px;font-size:11.5px;color:#8a5a00}
+.rd-low b{color:#6d4700}
+.rd-low .go{margin-left:auto;border:0;background:none;color:#6d4700;font-size:11px;font-weight:800;text-decoration:underline;padding:0}
+.rd-layout{display:grid;grid-template-columns:1fr 316px;gap:14px;align-items:start}
+.rd-main{min-width:0}
+.rd-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.pcard{position:relative;background:var(--card);border:1px solid #eadfd1;border-radius:14px;padding:11px 11px 10px;display:flex;flex-direction:column;gap:6px;transition:.13s;box-shadow:0 1px 2px rgba(50,35,20,.03);min-height:120px;overflow:hidden}
+.pcard:hover{transform:translateY(-2px);border-color:#d9c6ad;box-shadow:0 10px 22px rgba(50,35,20,.08)}
+.pcard.soldout{opacity:.58;background:#faf6f0}
+.pcard.soldout:hover{transform:none;box-shadow:none;border-color:#eadfd1}
+.pcard .pico{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:#f8f0e4;font-size:17px;line-height:1;flex:none}
+.pcard .pname{font-size:12.5px;font-weight:800;line-height:1.35;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;min-height:34px}
+.pcard .pfoot{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:auto}
+.pcard .pfoot b{font-family:var(--mono);font-size:13px}
+.pcard .pstock{font-size:10px;color:var(--muted);white-space:nowrap}
+.pcard .pstock.low{color:var(--warn);font-weight:800}
+.pcard .pstock.out{color:var(--bad);font-weight:800}
+.pcard .padd{position:absolute;right:9px;top:9px;width:24px;height:24px;border:0;border-radius:8px;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:14px;font-weight:800;line-height:1;padding:0}
+.pcard .padd:hover{background:#c9501f}
+.pcard .stepper{position:absolute;right:7px;top:7px;display:flex;align-items:center;gap:1px;background:var(--ink);border-radius:9px;padding:2px}
+.pcard .stepper button{width:20px;height:20px;border:0;background:transparent;color:#fff;font-size:13px;line-height:1;border-radius:6px;padding:0}
+.pcard .stepper button:hover{background:rgba(255,255,255,.18)}
+.pcard .stepper b{min-width:16px;text-align:center;font-size:11.5px;font-family:var(--mono);color:#fff}
+.pcard .sold-tag{position:absolute;top:9px;left:9px;font-size:9.5px;font-weight:800;color:#fff;background:var(--bad);border-radius:5px;padding:2px 5px}
+.pcard .pedit{position:absolute;right:9px;top:9px;width:24px;height:24px;border:1px solid var(--line);border-radius:8px;background:#fffdf8;color:var(--ink2);display:grid;place-items:center;font-size:12px;padding:0}
+.pcard .pedit:hover{border-color:#d9c6ad;background:#fff}
+.rd-empty{border:1px dashed #e7d9c7;border-radius:16px;background:linear-gradient(180deg,#fffdf9,#fbf6ee);padding:38px 20px;text-align:center}
+.rd-empty-ico{font-size:30px;line-height:1}
+.rd-empty h3{font-size:16px;margin-top:8px}
+.rd-empty p{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.75}
+.rd-empty .btn{margin-top:14px}
+.rd-cart{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;position:sticky;top:14px}
+.rd-cart .ch{display:flex;align-items:center;justify-content:space-between;padding:11px 13px;border-bottom:1px solid var(--line2);background:#fdfaf5}
+.rd-cart .ch b{font-size:13px}
+.rd-cart .ch .cnt{font-size:10.5px;color:var(--muted);font-weight:800}
+.rd-cart .cb{padding:6px 11px;min-height:96px;max-height:300px;overflow:auto}
+.rd-cart .crow{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px dashed var(--line2)}
+.rd-cart .crow:last-child{border-bottom:0}
+.rd-cart .crow .cn{flex:1;min-width:0;font-size:12px;font-weight:700;line-height:1.35}
+.rd-cart .crow .cn small{display:block;color:var(--muted);font-weight:600;font-size:10.5px}
+.rd-cart .crow .cq{display:flex;align-items:center;gap:2px}
+.rd-cart .crow .cq button{width:19px;height:19px;border:1px solid var(--line);background:#fff;border-radius:5px;font-size:12px;line-height:1;color:var(--ink2);padding:0}
+.rd-cart .crow .cq b{min-width:16px;text-align:center;font-family:var(--mono);font-size:11.5px}
+.rd-cart .crow .cx{border:0;background:none;color:#c9bdb0;font-size:12px;padding:0 2px}
+.rd-cart .crow .cx:hover{color:var(--bad)}
+.rd-cart .cf{padding:10px 12px 12px;border-top:1px solid var(--line2);background:#fdfaf5;display:flex;flex-direction:column;gap:8px}
+.rd-cart .ctot{display:flex;align-items:baseline;justify-content:space-between}
+.rd-cart .ctot span{font-size:12px;color:var(--muted);font-weight:700}
+.rd-cart .ctot b{font-family:var(--mono);font-size:22px;font-weight:850;letter-spacing:-.02em}
+.rd-cart .hold{display:flex;gap:6px}
+.rd-cart .hold select{flex:1;min-width:0}
+.rd-cart .cempty{padding:20px 8px;text-align:center;color:var(--muted);font-size:12px;line-height:1.7}
+.rd-attach{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;background:#e9f4ef;border:1px solid #c4e2d5;border-radius:10px;padding:8px 11px;font-size:11.5px;color:#1f6b52}
+.rd-attach button{margin-left:auto;border:0;background:none;color:#1f6b52;font-size:11px;font-weight:800;text-decoration:underline;padding:0}
+/* 结算弹窗里的配件块 */
+.acc-panel{margin:10px 0 2px;border:1px dashed var(--line);border-radius:10px;padding:10px 12px;background:#fdfaf5}
+.acc-h{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;font-weight:800;color:var(--ink2)}
+.acc-h b{font-family:var(--mono);color:var(--ink);margin-left:4px}
+.acc-list{margin-top:6px;display:flex;flex-direction:column;gap:5px}
+.acc-row{display:flex;align-items:center;gap:8px;font-size:12px}
+.acc-row .an{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acc-row .aq{font-family:var(--mono);color:var(--muted);font-size:11px}
+.acc-row .ap{font-family:var(--mono);font-weight:800;min-width:56px;text-align:right}
+.acc-row .ax{border:0;background:none;color:#c9bdb0;font-size:12px;padding:0 2px}
+.acc-row .ax:hover{color:var(--bad)}
+.acc-empty{font-size:11px;color:var(--muted)}
+.seat-acc{font-size:10px;font-weight:800;color:#b45309;margin-top:2px}
+/* 零售结算弹窗 */
+.rc-list{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.rc-row{display:flex;align-items:center;gap:8px;padding:8px 11px;border-bottom:1px solid var(--line2);font-size:12.5px}
+.rc-row:last-child{border-bottom:0}
+.rc-n{flex:1;min-width:0}
+.rc-q{font-family:var(--mono);color:var(--muted);font-size:11px}
+.rc-a{font-family:var(--mono);font-weight:800;min-width:60px;text-align:right}
+.rc-total{display:flex;align-items:baseline;gap:8px;padding:10px 0 2px}
+.rc-total span{font-size:12px;color:var(--muted);font-weight:700}
+.rc-total b{font-family:var(--mono);font-size:20px;margin-left:auto}
+.rc-total small{font-size:10.5px;color:var(--muted)}
+/* 分类 / 盘点 / 选配件列表 */
+.cat-row{display:flex;gap:6px;align-items:center;margin-bottom:7px}
+.cat-row .input{flex:1}
+.log-list{max-height:52vh;overflow:auto}
+.log-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px dashed var(--line2);font-size:12px}
+.log-row .lt{font-family:var(--mono);font-size:10.5px;color:var(--muted);flex:none}
+.log-row .ln{flex:1;min-width:0;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.log-row .ld{font-family:var(--mono);font-weight:800;min-width:36px;text-align:right}
+.log-row .ld.up{color:var(--ok)}
+.log-row .ld.down{color:var(--bad)}
+.log-row .lw{font-size:10.5px;color:var(--muted);min-width:58px;text-align:right}
+.ap-list{max-height:52vh;overflow:auto}
+.ap-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px dashed var(--line2)}
+.ap-row:last-child{border-bottom:0}
+.ap-row .ap-n{flex:1;min-width:0;font-size:12.5px;font-weight:650}
+.ap-row .ap-n small{display:block;color:var(--muted);font-size:10.5px;font-weight:500}
+.ap-row .ap-q{display:flex;align-items:center;gap:2px}
+.ap-row .ap-q button{width:20px;height:20px;border:1px solid var(--line);background:#fff;border-radius:5px;font-size:12px;line-height:1;padding:0}
+.ap-row .ap-q b{min-width:16px;text-align:center;font-family:var(--mono);font-size:11.5px}
+@media(max-width:1100px){.rd-layout{grid-template-columns:1fr}.rd-cart{position:static}}
+@media(max-width:820px){.rd-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:640px){.rd-grid{grid-template-columns:repeat(2,1fr)}.rd-bar .ctl{width:100%}.rd-bar .grow{display:none}}
 </style>
 </head>
 <body>
@@ -310,7 +660,7 @@ body{
       <h1>
         <span class="beads"><i></i><i></i><i></i><i></i></span>
         拼豆店
-        <button class="ver" id="verBtn" title="更新日志">v0.3.2</button>
+        <button class="ver" id="verBtn" title="更新日志">v0.7.0</button>
       </h1>
       <div class="sub">
         <span>Zetland · 10 个工位 · 智能板 / 普通板 · 豆子不限量</span>
@@ -320,12 +670,11 @@ body{
       </div>
     </div>
     <div class="head-right">
-      <button class="cfg-sum" id="cfgSum" title="价格设置（点击打开设置）">
+      <button class="cfg-sum" id="cfgSum" title="当前价格 · 点击修改（板型与价格）">
         <span id="cfgSumText">…</span><span class="caret"></span>
       </button>
       <span class="sync" id="syncBadge">本地</span>
       <button class="icon-btn" id="refreshBtn" title="刷新页面"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.4 6.4"/><path d="M20 4.5V11h-6.5"/></svg></button>
-      <button class="icon-btn" id="settingsBtn" title="设置（价格 / 手续费 / 会员折扣）"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="8" cy="17" r="2"/></svg></button>
     </div>
   </div>
 </header></div>
@@ -336,7 +685,14 @@ body{
   <button class="btn sm ghost" id="upLater">稍后</button>
 </div>
 
+<nav class="tabs" id="tabs">
+  <button class="tab on" data-tab="board"><span class="dot"></span>工位</button>
+  <button class="tab" data-tab="stats"><span class="dot"></span>统计</button>
+  <button class="tab" data-tab="staff"><span class="dot"></span>员工</button>
+  <button class="tab" data-tab="retail"><span class="dot"></span>配件</button>
+</nav>
 <main class="wrap">
+<div id="pane-board">
   <section class="summary">
     <div class="stat acc">
       <div class="stat-top"><span class="l">今日营收</span><span class="st-ico"><svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16"/><path d="M8 15l3-4 3 2 4-6"/></svg></span></div>
@@ -360,6 +716,7 @@ body{
     <section>
       <div class="board-head">
         <h2>10 个工位</h2>
+        <button class="btn sm" id="priceBtn" title="板型、时价、套餐价、超时价">⚙ 价格</button>
         <div class="legend">
           <span><i style="background:#2c7a6b"></i>智能板</span>
           <span><i style="background:#b9861f"></i>普通板</span>
@@ -376,11 +733,136 @@ body{
       </div>
     </aside>
   </div>
+
+  <!-- 结算记录全表（照搬天胡 renderHistory 的「按日期分组 + 小计 + 分页」）-->
+  <section class="hist" id="histPanel">
+    <div class="hist-head">
+      <h3>结算记录</h3>
+      <input type="text" id="histFilter" class="ctl w160" placeholder="搜日期 / 工位 / 金额">
+      <span class="count" id="histCount" style="font-size:11px;color:var(--muted)">0 笔</span>
+    </div>
+    <div class="hist-scroll" id="histWrap"></div>
+    <div class="pager" id="histPager"></div>
+  </section>
+</div><!-- /pane-board -->
+
+<div id="pane-stats" hidden>
+  <div class="toolbar">
+    <button class="btn ghost sm" id="stPrev" title="往前">◀</button>
+    <input type="date" id="stDate" class="ctl">
+    <input type="week" id="stWeek" style="display:none">
+    <input type="month" id="stMonth" style="display:none">
+    <button class="btn ghost sm" id="stNext" title="往后">▶</button>
+    <span class="scope">
+      <button class="btn primary sm" id="stByDay">按日</button>
+      <button class="btn sm" id="stByWeek">按周</button>
+      <button class="btn sm" id="stByMonth">按月</button>
+    </span>
+    <button class="btn sm" id="stToday">今天</button>
+    <button class="btn sm" id="stCopyBtn">📋 生成文案</button>
+    <button class="btn sm" id="paySetBtn" title="刷卡手续费、会员优惠、人民币汇率">⚙ 收款设置</button>
+    <span class="small muted" id="stRange" style="margin-left:auto"></span>
+  </div>
+  <div class="cards" id="stCards"></div>
+  <div id="stEstimate"></div>
+  <section class="hist">
+    <div class="hist-head"><h3 id="stTxnTitle">明细</h3><span class="small muted" id="stTxnSum"></span></div>
+    <div class="hist-scroll" id="stTxnWrap"></div>
+  </section>
+</div>
+
+<div id="pane-staff" hidden>
+  <div class="hist" style="margin-top:0">
+    <div class="hist-head">
+      <h3>员工列表</h3>
+      <input type="text" id="empName" class="ctl w140" placeholder="员工姓名">
+      <button class="btn acc sm" id="empAdd">+ 添加员工</button>
+      <button class="btn sm" id="wageToggle">💰 工资汇总</button>
+    </div>
+    <div class="panel-b">
+      <div class="staff-grid" id="empList"></div>
+    </div>
+  </div>
+
+  <section class="hist" id="wageSection" style="display:none">
+    <div class="hist-head">
+      <h3>💰 工资汇总</h3>
+      <input type="month" id="wageMonth" class="ctl">
+      <input type="week" id="wageWeek" class="ctl" style="display:none">
+      <span class="scope">
+        <button class="btn primary sm" id="wageByMonth">按月</button>
+        <button class="btn sm" id="wageByWeek">按周</button>
+      </span>
+      <button class="btn sm" id="wagePeriodNow">本月</button>
+      <span class="small muted" id="wageRange"></span>
+      <button class="btn ghost sm" id="wageClose" style="margin-left:auto">收起 ✕</button>
+    </div>
+    <div class="panel-b">
+      <div class="wagebox">
+        <span>白班时薪 $<input type="number" id="dayRate" min="0" step="0.5" class="w74"></span>
+        <span>晚班时薪 $<input type="number" id="nightRate" min="0" step="0.5" class="w74"></span>
+        <span>晚班判定：到 <input type="text" id="nightAt" maxlength="5" inputmode="numeric" class="w64"> 还在上班 → 整班算晚班</span>
+      </div>
+      <div class="wagebox">
+        <span>忙日门槛：当天营业额超过 $<input type="number" id="busyThreshold" min="0" step="50" class="w86"> → 每小时 +$<input type="number" id="busyBonus" min="0" step="0.5" class="w74"></span>
+      </div>
+      <div class="wagebox"><span class="t">口径：营业额 = 台费 + 其它费用（不含刷卡手续费）；未下班的班次算到此刻。</span></div>
+      <div id="wageList"></div>
+    </div>
+  </section>
+
+  <section class="hist">
+    <div class="hist-head">
+      <h3>打卡记录</h3>
+      <button class="btn sm" id="attAdd">+ 手动补录</button>
+      <span class="small muted" id="attCount"></span>
+    </div>
+    <div class="hist-scroll" id="attWrap"></div>
+  </section>
+</div>
+
+<div id="pane-retail" hidden>
+  <section class="rd-top">
+    <div class="rd-bar">
+      <input type="text" id="rdSearch" class="ctl" placeholder="搜配件名">
+      <div class="rd-cats" id="rdCats"></div>
+      <button class="btn sm ghost" id="rdCatAdd">＋ 分类</button>
+      <span class="grow"></span>
+      <button class="btn acc sm" id="rdItemAdd">＋ 新增商品</button>
+      <button class="btn sm" id="rdEditBtn">✎ 编辑商品</button>
+      <button class="btn sm" id="rdLogs">📋 盘点记录</button>
+    </div>
+    <div class="rd-low" id="rdLow" hidden></div>
+    <div class="rd-attach" id="rdAttachBar" hidden></div>
+  </section>
+
+  <div class="rd-layout">
+    <section class="rd-main">
+      <div class="rd-grid" id="rdGrid"></div>
+      <div class="rd-empty" id="rdEmpty" hidden>
+        <div class="rd-empty-ico">🧩</div>
+        <h3>还没有配件</h3>
+        <p>把店里的镊子、板子、钥匙扣配件加进来，卖的时候点一下就行。<br>分类也可以自己加：工具 / 材料 / 成品，或者按你自己习惯分。</p>
+        <button class="btn acc" id="rdEmptyAdd">＋ 新增第一个商品</button>
+      </div>
+    </section>
+    <aside class="rd-cart" id="rdCart"></aside>
+  </div>
+
+  <section class="hist" id="rdHist">
+    <div class="hist-head">
+      <h3>配件销售记录</h3>
+      <span class="small muted" id="rdRecSum"></span>
+    </div>
+    <div class="hist-scroll" id="rdRecords"></div>
+    <div class="pager" id="rdPager"></div>
+  </section>
+</div>
 </main>
 
 <footer class="foot">
   <span>拼豆店 · Zetland · 10 个工位</span>
-  <span>数据每 3 秒同步 · <b id="footVer">v0.3.2</b></span>
+  <span>数据每 3 秒同步 · <b id="footVer">v0.7.0</b></span>
 </footer>
 
 <div class="modal" id="modal">
@@ -391,6 +873,102 @@ body{
   </div>
 </div>
 <div class="toast" id="toast"></div>
+
+<!-- ============================================================
+     结算弹窗 —— 结构照搬自 天胡麻将系统/mahjong-timer.html:743-895
+     未搬：罚款(sFineBox)、合并另一桌(sMerge)、按人分账(splitPanel/sp-*)、
+          快捷收款(sQuickBlock)、会员扣款（拼豆没有会员体系）
+     ============================================================ -->
+<div id="settleOverlay">
+  <div id="settleModal">
+    <div class="settle-left">
+      <h3 id="sTitle">结算</h3>
+      <!-- 修改结算记录 = 同一弹窗的编辑模式（天胡 mahjong-timer.html:746-766） -->
+      <div id="sEditTime" style="display:none;text-align:left;margin:0 0 12px;padding:10px 12px;
+                  border:1px solid var(--line);border-radius:10px;background:var(--bg2)">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:12.5px;font-weight:800;color:#92400e">✎ 修改这条记录</span>
+          <label style="font-size:12px;color:var(--muted);margin-left:6px">工位</label>
+          <select id="sEditTable" style="width:112px;padding:6px 8px;border:1px solid var(--line);border-radius:8px"></select>
+          <label style="font-size:12px;color:var(--muted)">单价</label>
+          <input type="number" id="sEditRate" min="0" step="0.5"
+                 style="width:84px;padding:6px 8px;border:1px solid var(--line);border-radius:8px">
+          <span style="font-size:11.5px;color:var(--muted)" id="sEditRateUnit">$/小时（当时的单价）</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
+          <input type="date" id="sEditDate" style="width:150px;padding:6px 8px;border:1px solid var(--line);border-radius:8px">
+          <input type="text" id="sEditStart" class="time-input" placeholder="HH:MM" maxlength="5" inputmode="numeric">
+          <span style="color:var(--muted)">–</span>
+          <input type="text" id="sEditEnd" class="time-input" placeholder="HH:MM" maxlength="5" inputmode="numeric">
+        </div>
+        <div class="hint" id="sEditHint" style="margin:6px 0 0"></div>
+        <div class="error" id="sEditError" style="display:none"></div>
+      </div>
+      <div class="rows" id="sInfo"></div>
+      <div class="acc-panel" id="sAccPanel">
+        <div class="acc-h">
+          <span>🧩 配件 <b id="sAccSum">$0.00</b></span>
+          <button type="button" class="btn sm" id="sAccAdd">＋ 加配件</button>
+        </div>
+        <div class="acc-list" id="sAccList"></div>
+      </div>
+      <div class="divider"></div>
+      <div class="field">
+        <!-- 拼豆保留项：会员折扣（天胡没有折扣，天胡的会员是「余额抵扣」，未搬） -->
+        <label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink2);font-weight:600">
+          <input type="checkbox" id="sMemDisc" style="width:15px;height:15px;accent-color:var(--accent)">
+          <span>会员 <b id="sMemDiscPct">10</b>% 优惠（拼豆保留项）</span>
+        </label>
+      </div>
+      <button type="button" class="btn-ghost sm" id="sDetailToggle" style="margin-top:4px">▸ 账单明细 / 汇率</button>
+      <div id="sDetailWrap" style="display:none">
+        <div class="rows" id="sBreakdown"></div>
+        <div class="rmb-line" id="sRmb"></div>
+      </div>
+    </div>
+    <div class="settle-right">
+      <div class="field" id="sSplitWrap">
+        <label style="font-weight:400;font-size:12.5px;color:var(--muted)">收款明细</label>
+        <div id="sParts"></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+          <button type="button" class="btn-ghost sm" id="sAddRow">+ 加一笔</button>
+          <button type="button" class="btn-ghost sm" id="sMoreBtn">⋯ 更多选项</button>
+        </div>
+        <div id="sMoreWrap" style="display:none;margin-top:10px;padding:10px 12px;border:1px dashed var(--line);border-radius:10px;background:#fafafa">
+          <div class="field" style="margin:0 0 8px">
+            <label style="font-weight:400;font-size:12.5px;color:var(--muted)">其它费用（澳币）</label>
+            <input type="number" id="sOther" min="0" step="0.5" value="0">
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button type="button" class="btn-ghost sm" id="sEven">平分（按现有笔数）</button>
+            <button type="button" class="btn-ghost sm" id="sAllOne">一人全付</button>
+          </div>
+        </div>
+        <div class="hint" id="sRef"></div>
+        <div class="hint" id="sPartsInfo"></div>
+        <div id="sShortWrap" style="display:none;margin-top:10px;padding:10px 12px;background:#fff8e1;
+             border:1px solid #e5c37e;border-radius:8px;text-align:left">
+          <div style="font-size:13px;color:#8a5a00">还差 <b id="sShortAmt">$0.00</b> 没收齐，怎么处理？</div>
+          <label style="display:block;font-size:13px;margin-top:6px;color:#8a5a00"><input type="radio" name="sShort" value="carry"> 记在这个工位上，下次一起结</label>
+          <label style="display:block;font-size:13px;margin-top:4px;color:#8a5a00"><input type="radio" name="sShort" value="waive"> 直接免除（抹掉，不算欠）</label>
+          <div class="hint" id="sShortHint" style="display:none;margin:6px 0 0;color:#8a5a00"></div>
+        </div>
+      </div>
+      <div class="settle-foot">
+        <div class="sf-k">实收合计</div>
+        <div class="big" id="sGrand">$0.00</div>
+        <div class="sf-sub" id="sGrandRmb"></div>
+        <div class="sf-sub" id="sRemain"></div>
+        <div class="modal-btns">
+          <button id="sConfirm" class="btn-settle">确认结算</button>
+          <button id="sCancel" class="btn-ghost">取消</button>
+        </div>
+        <button id="sEditDel" style="display:none;margin-top:8px;width:100%;background:#fff;border:1px solid #fca5a5;
+                color:#b91c1c;border-radius:10px;padding:9px;font-size:12.5px;font-weight:700">删除这条记录</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
 (function(){
@@ -416,17 +994,24 @@ const round4 = n => Math.round((+n || 0) * 10000) / 10000;
 /* Firebase：独立项目 pindoushop 下的 shops/<key>/state；REST 轮询同步 */
 const FB_URL = "https://pindoushop-default-rtdb.asia-southeast1.firebasedatabase.app/shops/pindou-b7f9a52ba498/state.json";
 const FB_VER_URL = FB_URL.replace(/\/state\.json$/, "/__sysVer.json");
-const APP_VER = "v0.3.2", APP_DATE = "2026-11-24";
+const APP_VER = "v0.7.0", APP_DATE = "2026-11-27";
 // >>> APP_CHANGELOG BEGIN（自动生成，勿手改）
 const APP_CHANGELOG = [
+  { ver: "v0.7.0", date: "2026-11-27", sum: "新增配件页，可挂工位也可单独卖", items: ["新增 顶部第四个页签「配件」，商品和分类都自己加，点卡片加购、库存售罄拦截、盘点记录", "新增 结算弹窗里「＋ 加配件」，工位上挂着的配件自动带出，和其它费用一起进账单", "新增 单独结算走「配件零售」单，不占工位，支持现金 / 刷卡 / 人民币", "调整 配件库存只在落单时扣，结算扣、改单按差额补、删单归还，挂账期间不扣", "调整 统计「其它费用」里拆出「其中配件」，结算记录与今日收款认零售单", "测试 新增配件冒烟 41 项，连同结算 27 项、页面 79 项共 147 项全绿。"] },
+  { ver: "v0.6.6", date: "2026-11-27", sum: "工位卡不再逐个显示价格", items: ["调整 空工位的「智能板 / 普通板」按钮去掉单价，只留板型名，价格统一看顶部价格摘要", "调整 两个按钮改成单行居中、稍高一点，去掉为放价格留的竖排布局", "移除 不再使用的 `priceLabel()` 函数", "测试 结算冒烟 27 项与页面冒烟 77 项回归通过。"] },
+  { ver: "v0.6.5", date: "2026-11-27", sum: "所有输入框统一成暖色手作样式", items: ["调整 全站输入框与下拉统一为一套外观，暖白底、10px 圆角、细边、聚焦时橙色描边加光晕", "调整 结算记录搜索、员工姓名、工资周期、统计日期与打卡班次下拉这些原来是浏览器默认样式，现在跟工位卡同一套语言", "调整 日期 / 周 / 月选择器给定合理宽度，不再缩成一团", "弹窗里的输入框也换成同一底色与聚焦环", "测试 页面冒烟 77 项与结算冒烟 27 项回归通过。"] },
+  { ver: "v0.6.4", date: "2026-11-27", sum: "二次确认点到别处即作废", items: ["调整 「再点一次确认删除」统一成一套机制，删除结算记录、删除员工、删除打卡记录都走同一份逻辑", "新增 只要鼠标点到别的地方（包括卡片、输入框、弹窗内其它位置），待确认状态立刻复位、文案还原，不会误删", "调整 切换页签或关闭弹窗时也会清掉所有待确认状态", "测试 页面冒烟扩展到 77 项断言，三处待确认都验证了「点别处作废且没删掉数据」。"] },
+  { ver: "v0.6.3", date: "2026-11-27", sum: "员工卡换成拼豆自己的手作样式", items: ["调整 员工卡沿用拼豆工位卡的边框、阴影与圆角，头像改成圆角色块，状态带小圆点", "调整 开始时间一行改为虚线圈住，和空工位的虚线呼应", "上班打卡用拼豆橙色强调色，下班打卡用暂停态的暖黄", "调整 在班时整张卡片用「计时中」同款暖色高亮，删除员工收成右下角小字，不抢主按钮", "测试 页面冒烟 69 项断言仍全绿。"] },
+  { ver: "v0.6.2", date: "2026-11-27", sum: "员工卡改版，头像与开始时间一行", items: ["调整 员工卡改为头像、姓名、在班状态、开始时间一行、一个打卡按钮与删除员工，同一时间只出现一个打卡按钮", "新增 员工可点铅笔改名，改名会同步这个人已有的打卡记录，工资不会算不到", "调整 删除员工改为两下确认，避免手滑误删", "测试 页面冒烟扩展到 69 项断言，覆盖改名同步与删除确认。"] },
+  { ver: "v0.6.1", date: "2026-11-27", sum: "上班打卡改为卡片上直接填时间", items: ["调整 员工卡上直接给出上班时间输入框，点「上班」即打卡，留空按现在、填了就按填的时间开始上班", "移除 点上班时弹出的时间弹窗，少一次点击，打完卡输入框自动清空", "测试 页面冒烟覆盖手填时间与留空两种打卡方式，61 项断言通过。"] },
+  { ver: "v0.6.0", date: "2026-11-27", sum: "设置拆分到对应页面，上班打卡可填时间", items: ["调整 设置拆成两块，板型与价格放进工位页「价格」按钮与顶部价格摘要，收款与汇率放进统计页「收款设置」，工资相关仍在员工页工资汇总", "移除 顶部统一的「设置」图标，不再一个弹窗塞十几项", "新增 员工上班打卡可以手动输入上班日期与时间，默认现在，另有「用现在」按钮", "修复 保存价格时会整体替换设置对象，把白班晚班时薪与忙日门槛冲掉的问题", "测试 页面冒烟扩展到 61 项断言，覆盖设置拆分与手动打卡。"] },
+  { ver: "v0.5.1", date: "2026-11-27", sum: "今日收款面板与工位区等高", items: ["调整 侧栏「今日收款」高度与左边工位区对齐，超出的记录在面板内滚动", "调整 面板底部加渐隐提示，能看出下面还有内容", "修复 之前用 grid 拉伸对齐会反过来把工位区撑高，改为由工位区定高、侧栏封顶", "测试 页面冒烟 38 项与结算冒烟 27 项回归通过。"] },
+  { ver: "v0.5.0", date: "2026-11-27", sum: "新增统计页与员工页，收款记录能看全部", items: ["新增 顶部页签分为工位、统计、员工三页，工位页下方新增结算记录全表，按日期分组、每组小计、可搜索、分页", "新增 统计页支持按日、按周、按月切换与前后翻页，展示营业总额、台费、其它费用、手续费、人民币、客单与计时总长，并可生成统计文案", "新增 员工页支持员工名单、上下班打卡、手动补录与修改、班次指定，工资按白班晚班时薪与忙日加成汇总，可按月或按周查看", "调整 侧栏今日收款不再截断 8 条，改为列出当天全部并在面板内滚动", "测试 页面冒烟覆盖页签、记录分组分页、统计口径、工资计算共 38 项断言。"] },
+  { ver: "v0.4.0", date: "2026-11-27", sum: "结账改为天胡式收款明细与挂账补收", items: ["新增 结算弹窗改为收款明细逐笔记账，可按笔选现金、刷卡、人民币并拆成混合支付，刷卡可填实收自动反推本金", "新增 少收的钱可选记在工位上或直接免除，工位卡出现补收入口，补收只收欠款不再叠加台费", "调整 结算记录存 `parts` 明细与起止时间字段，今日收款可点开原地修改或删除，旧记录自动迁移", "测试 真 Chrome 跑通开台、结算、编辑、撤销结束、挂账补收 25 项断言，发布体检含日志一致性。"] },
   { ver: "v0.3.2", date: "2026-11-24", sum: "新增人民币收款与实时汇率", items: ["新增 结算支持人民币收款，按设置汇率把澳币应收折算成人民币，记录中保存币种与汇率", "新增 设置页可实时拉取 AUD→CNY 市场价，按加点计算报价并保存更新时间", "调整 顶部价格摘要显示当前汇率，今日营收显示人民币小计", "测试 汇率接口、人民币结算与 Chrome 冒烟。"] },
   { ver: "v0.3.1", date: "2026-11-24", sum: "调整顶部与统计卡间距", items: ["调整 顶部卡片上边距从 20px 到 28px，移动端为 18px", "调整 顶部卡片与统计卡之间增加 22px 间距", "修复 顶部卡片与内容区左右未对齐", "测试 桌面与移动端截图检查。"] },
   { ver: "v0.3.0", date: "2026-11-24", sum: "整体界面视觉改版", items: ["调整 顶部栏、统计卡、工位卡、收款列表、弹窗统一为暖色手作风格", "新增 统计卡图标、工位板型价签、收款方式标签与页脚", "优化 运行中、暂停工位增加状态色条与悬停反馈", "测试 Chrome 冒烟、更新日志生成与移动端截图。"] },
   { ver: "v0.2.3", date: "2026-11-24", sum: "更新日志改为手风琴并统一规范", items: ["调整 更新日志唯一来源改为 README 的「最近 15 个版本」表格，由 `生成更新日志.py` 注入页面", "新增 弹窗默认收起，一行显示版本、日期、条数、摘要，点一行展开详情", "调整 详情按「新增、调整、修复、移除、优化、测试」开头，摘要不超过 28 字", "新增 发布体检校验页面内嵌日志与 README 是否同步。"] },
-  { ver: "v0.2.2", date: "2026-11-24", sum: "顶部栏改为天胡式卡片布局", items: ["调整 顶部栏改为圆角渐变卡片，标题与版本号同行", "新增 价格摘要显示两种板型时价与套餐价，点击打开设置", "调整 同步状态、刷新、设置改为图标按钮，移动端自动换行。"] },
-  { ver: "v0.2.1", date: "2026-11-24", sum: "新增一键发布工具", items: ["新增 发布前版本、文件、Chrome、Firebase、GitHub 体检", "新增 发布锁、状态文件与发布日志", "优化 GitHub 改为一次 commit 原子提交", "新增 等线上生效后写 `__sysVer` 广播。"] },
-  { ver: "v0.2.0", date: "2026-11-24", sum: "移除烫位队列并改到 Zetland", items: ["移除 烫位排队、熨烫中、可取件状态，结算收款即完成", "调整 顶部统计改为今日单数、平均客单", "调整 门店位置改为 Zetland", "新增 版本号、更新日志、发布后自动广播刷新。"] },
-  { ver: "v0.1.0", date: "2026-11-24", sum: "第一版 10 工位看板上线", items: ["新增 10 个工位与智能板、普通板选择", "新增 按小时与 2 小时套餐计费", "新增 现金、刷卡、会员优惠结算", "新增 Firebase 多设备同步与 GitHub Pages 部署。"] },
 ];
 // <<< APP_CHANGELOG END（自动生成，勿手改）
 
@@ -436,15 +1021,74 @@ const DEFAULT_SETTINGS = {
   packageMinutes: 120,
   smartExtra: 3.75, normalExtra: 2.5,
   cardFee: 1.2, memberDiscount: 10,
-  fxRate: 4.7, fxMarkup: 0.45, fxMarket: 0, fxUpdatedAt: "", fxFetchedAt: 0
+  fxRate: 4.7, fxMarkup: 0.45, fxMarket: 0, fxUpdatedAt: "", fxFetchedAt: 0,
+  dayRate: 25, nightRate: 30, nightAt: "21:00", busyThreshold: 400, busyBonus: 2
 };
+function freshSeat(i){
+  return {id:i + 1, status:"idle", type:null, billing:null, startAt:0, accMs:0, price:null, last:null,
+          endedAt:0, carry:0, cart:[]};
+}
+function freshItem(){
+  return {id:"", name:"", cat:"", price:0, stock:0, low:3, note:"", sort:0};
+}
 function freshState(){
   return {
-    version: 1,
+    version: 3,
     settings: Object.assign({}, DEFAULT_SETTINGS),
-    seats: Array.from({length:10}, (_, i) => ({id:i + 1, status:"idle", type:null, billing:null, startAt:0, accMs:0, price:null, last:null})),
-    records: [], updatedAt: 0
+    seats: Array.from({length:10}, (_, i) => freshSeat(i)),
+    records: [],
+    employees: [],
+    attendance: [],
+    items: [],        // 配件商品：{id,name,cat,price,stock,low,note,sort}
+    cats: [],         // 自定义分类：{id,name,emoji,sort}
+    stockLogs: [],    // 库存变动：{id,ts,itemId,name,delta,before,after,why}
+    updatedAt: 0
   };
+}
+/* 配件明细归一：{id,name,price,qty}，数量和单价都转数字 */
+function normItems(list){
+  if (!Array.isArray(list)) return [];
+  return list.filter(x => x && (x.id || x.name)).map(x => ({
+    id: String(x.id || ""),
+    name: String(x.name || ""),
+    price: round2(+x.price || 0),
+    qty: Math.max(0, Math.round(+x.qty || 0))
+  })).filter(x => x.qty > 0);
+}
+function itemsSum(list){
+  return round2((list || []).reduce((a, x) => a + (+x.price || 0) * (+x.qty || 0), 0));
+}
+/* 旧记录（v1：{amount, cny, pay, minutes}）→ 天胡式记录结构（v2） */
+function migrateRecord(r){
+  if (!r || r.grand != null) return r;
+  const total = round2(+r.amount || 0);
+  const cny = +r.cny || 0;
+  const payType = r.pay === "人民币" ? "rmb" : (r.pay === "刷卡" ? "card" : "cash");
+  const d = r.date || "";
+  const part = {amount: total, payType: payType, fee: 0, due: total, rmb: payType === "rmb" ? cny : null,
+                rmbChannel: payType === "rmb" ? "wx" : "", cashChannel: payType === "cash" ? "cash" : "",
+                label: "", dueOverride: null};
+  return Object.assign({}, r, {
+    seatNo: +r.seatId || 0,
+    name: pad2(+r.seatId || 0) + " 号工位",
+    billing: "hourly",
+    price: null,
+    startTs: 0, endTs: 0,
+    start: "", end: "",
+    hours: round2((+r.minutes || 0) / 60),
+    tableFee: total, tableAll: total, disc: 0, other: 0,
+    total: total, fee: 0, grand: total, collected: total,
+    cashSum: payType === "cash" ? total : 0,
+    cardSum: payType === "card" ? total : 0,
+    rmbSum: payType === "rmb" ? total : 0,
+    rmbActual: cny, perTable: 0,
+    unpaid: 0, carryIn: 0, parts: [part], payType: payType,
+    memberId: "", memberName: "", balanceUsed: 0, memberUsed: 0,
+    mergedTable: "", mergedSum: 0,
+    range: "", payDetail: "", waived: 0,
+    time: (d ? d + " " : "") + (r.time || ""),
+    amount: total
+  });
 }
 function normalize(v){
   const base = freshState();
@@ -452,15 +1096,42 @@ function normalize(v){
   base.settings = Object.assign({}, DEFAULT_SETTINGS, v.settings || {});
   base.seats = Array.from({length:10}, (_, i) => {
     const d = (v.seats || []).find(x => x && +x.id === i + 1) || {};
-    return Object.assign({id:i + 1, status:"idle", type:null, billing:null, startAt:0, accMs:0, price:null, last:null}, d);
+    const st = Object.assign(freshSeat(i), d, {id:i + 1});
+    st.cart = normItems(d.cart);
+    return st;
   });
-  base.records = Array.isArray(v.records) ? v.records.filter(r => r && r.id) : [];
+  base.records = Array.isArray(v.records) ? v.records.filter(r => r && r.id).map(migrateRecord) : [];
+  base.records.forEach(r => {
+    r.kind = r.kind === "retail" ? "retail" : "station";
+    r.items = normItems(r.items);
+    r.accessories = r.items.length ? itemsSum(r.items) : round2(+r.accessories || 0);
+  });
+  base.employees = Array.isArray(v.employees) ? v.employees.filter(e => e && e.name) : [];
+  base.attendance = Array.isArray(v.attendance) ? v.attendance.filter(a => a && a.name) : [];
+  base.cats = Array.isArray(v.cats) ? v.cats.filter(c => c && c.name).map((c, i) => ({
+    id: String(c.id || nextId()), name: String(c.name), emoji: String(c.emoji || ""), sort: +c.sort || i
+  })) : [];
+  base.items = Array.isArray(v.items) ? v.items.filter(x => x && x.name).map((x, i) => ({
+    id: String(x.id || nextId()), name: String(x.name), cat: String(x.cat || ""),
+    price: round2(+x.price || 0), stock: Math.max(0, Math.round(+x.stock || 0)),
+    low: Math.max(0, Math.round(+x.low != null ? +x.low : 3)), note: String(x.note || ""),
+    sort: +x.sort || i
+  })) : [];
+  base.stockLogs = Array.isArray(v.stockLogs) ? v.stockLogs.filter(x => x && x.name).slice(0, 300) : [];
   base.updatedAt = +v.updatedAt || 0;
   return base;
 }
 const STORE_KEY = "pindou_board_v1";
 let state = freshState();
 let pushing = false, pushTimer = null;
+/* 配件页 / 结算里的配件状态 */
+let retailCat = "all";
+let retailQ = "";
+let retailCart = [];
+let rdEditMode = false;
+let rdSeatSel = 1;
+let rdDelArm = "", rdDelTimer = null;
+let settleExtras = [];          // 当前结算弹窗里的配件 [{id,name,price,qty}]
 
 function loadLocal(){
   try {
@@ -544,36 +1215,76 @@ function renderCfgSum(){
   const s = state.settings;
   $("#cfgSumText").textContent = "智能 $" + s.smartHourly + "/h · 普通 $" + s.normalHourly + "/h · 套餐 $" + s.smartPackage + "/$" + s.normalPackage + " · 汇率 " + (+s.fxRate || "—");
 }
+/* 侧栏「今日收款」高度 = 左边工位区高度（多出来的在面板内滚动）
+   为什么用 JS：grid 的 stretch 会被侧栏内容反过来撑高整列，所以由工位区定高、侧栏封顶 */
+function syncAsideHeight(){
+  const sec = document.querySelector("#pane-board .layout > section");
+  const panel = document.querySelector("#pane-board aside > .panel");
+  if (!sec || !panel) return;
+  if (window.matchMedia("(max-width:1100px)").matches){ panel.style.maxHeight = ""; return; }
+  const h = Math.round(sec.getBoundingClientRect().height);
+  panel.style.maxHeight = h > 0 ? h + "px" : "";
+  markScrollable();
+}
+function markScrollable(){
+  const b = document.querySelector("#pane-board aside > .panel > .panel-b");
+  if (b) b.classList.toggle("has-more", b.scrollHeight > b.clientHeight + 2);
+}
+window.addEventListener("resize", syncAsideHeight);
+
 function renderAll(){
   renderSeats();
   renderSummary();
   renderRecords();
   renderCfgSum();
-}
-function priceLabel(type){
-  const s = state.settings;
-  return "$" + (type === "smart" ? s.smartHourly : s.normalHourly) + "/h 起";
+  if (typeof renderHistory === "function") renderHistory();   // 结算记录全表（页签下方常驻）
+  syncAsideHeight();                                          // 侧栏跟着工位区等高
+  markScrollable();
+  if (typeof renderStats === "function" && currentTab === "stats") renderStats();
+  if (typeof renderStaff === "function" && currentTab === "staff") renderStaff();
+  if (typeof renderRetail === "function" && currentTab === "retail") renderRetail();
 }
 function renderSeats(){
   $("#seats").innerHTML = state.seats.map(s => {
     const num = pad2(s.id);
+    const carry = round2(Number(s.carry) || 0);
+    const carryTip = carry > 0.005 ? `<div class="carry-tip">上次未付 ${money(carry)}</div>` : "";
+    const accSum = itemsSum(s.cart || []);
+    const accTip = accSum > 0.005 ? `<div class="seat-acc">🧩 配件 ${money(accSum)}</div>` : "";
     if (s.status === "idle"){
       return `<div class="seat idle">
         <div class="sh"><span class="no">${num} 号</span><span class="badge">空闲</span></div>
         <div class="timer">— — —</div>
         <div class="sub">${s.last ? "上一单 " + money(s.last.amount) + " · " + (s.last.time || "") : "选板型开台"}</div>
+        ${carryTip}${accTip}
         <div class="idle-pick">
-          <button class="btn acc pick" data-act="open" data-id="${s.id}" data-type="smart"><span>智能板</span><small>${priceLabel("smart")}</small></button>
-          <button class="btn pick" data-act="open" data-id="${s.id}" data-type="normal"><span>普通板</span><small>${priceLabel("normal")}</small></button>
+          <button class="btn acc pick" data-act="open" data-id="${s.id}" data-type="smart"><span>智能板</span></button>
+          <button class="btn pick" data-act="open" data-id="${s.id}" data-type="normal"><span>普通板</span></button>
+        </div>
+        ${carry > 0.005 ? `<div class="acts"><button class="btn wide" data-act="carrypay" data-id="${s.id}">💵 补收上次未付 ${money(carry)}</button></div>` : ""}
+      </div>`;
+    }
+    const ms = elapsed(s);
+    const b = billFor(s, ms);
+    if (s.status === "ended"){
+      return `<div class="seat ended">
+        <div class="sh"><span class="no">${num} 号</span><span class="badge pause">待结算</span></div>
+        <div class="timer" data-timer="${s.id}">${fmtDur(ms)}</div>
+        <div class="sub">${TYPE[s.type] || ""} · ${BILL[s.billing] || ""} · 已停表</div>
+        <div class="amt" data-amt="${s.id}">应收 ${money(b.amount + carry)}</div>
+        ${carryTip}${accTip}
+        <div class="acts">
+          <button class="btn primary wide" data-act="settle2" data-id="${s.id}">结算</button>
+          <button class="btn" data-act="unend" data-id="${s.id}">撤销结束</button>
         </div>
       </div>`;
     }
-    const ms = elapsed(s), b = billFor(s, ms);
     return `<div class="seat ${s.status}">
       <div class="sh"><span class="no">${num} 号</span><span class="badge ${s.type}">${TYPE[s.type]} · ${BILL[s.billing]}</span></div>
       <div class="timer" data-timer="${s.id}">${fmtDur(ms)}</div>
       <div class="sub">${s.status === "paused" ? "已暂停" : (s.billing === "hourly" ? "A$" + (s.price ? s.price.hourly : "") + "/小时 · 15 分钟进位" : "2 小时套餐 · 超时 A$" + (s.price ? s.price.extra15 : "") + "/15 分钟")}</div>
       <div class="amt" data-amt="${s.id}">预估 ${money(b.amount)}</div>
+      ${carryTip}${accTip}
       <div class="acts">
         ${s.status === "running"
           ? `<button class="btn" data-act="pause" data-id="${s.id}">暂停</button>`
@@ -586,11 +1297,12 @@ function renderSeats(){
 function renderSummary(){
   const today = todayKey();
   const rows = state.records.filter(r => r.date === today);
-  const rev = rows.reduce((a, r) => a + (+r.amount || 0), 0);
-  const active = state.seats.filter(s => s.status !== "idle").length;
-  const cny = rows.reduce((a, r) => a + (+r.cny || 0), 0);
+  const rev = rows.reduce((a, r) => a + recCollected(r), 0);
+  const active = state.seats.filter(s => s.status === "running" || s.status === "paused").length;
+  const cny = rows.reduce((a, r) => a + (+r.rmbActual || +r.cny || 0), 0);
+  const unpaid = rows.reduce((a, r) => a + (+r.unpaid || 0), 0);
   $("#sumRev").textContent = money(rev);
-  $("#sumSub").textContent = "已收款" + (cny > 0 ? " · 人民币 ¥" + cny.toFixed(2) : "");
+  $("#sumSub").textContent = "已收款" + (cny > 0 ? " · 人民币 ¥" + cny.toFixed(2) : "") + (unpaid > 0.005 ? " · 未收 " + money(unpaid) : "");
   $("#sumActive").textContent = active + " / 10";
   $("#sumActiveSub").textContent = "利用率 " + Math.round(active / 10 * 100) + "%";
   $("#sumOrders").textContent = rows.length;
@@ -598,12 +1310,24 @@ function renderSummary(){
 }
 function renderRecords(){
   const today = todayKey();
-  const rows = state.records.filter(r => r.date === today).slice().reverse().slice(0, 8);
-  $("#recCount").textContent = state.records.filter(r => r.date === today).length + " 笔";
-  $("#records").innerHTML = rows.length ? rows.map(r =>
-    `<div class="rec-item"><span class="rec-l"><span class="rec-time">${r.time}</span><span class="rec-seat">${pad2(r.seatId)} 号</span><span class="rec-type">${TYPE[r.type] || ""}</span></span><span class="rec-r"><b>${money(r.amount)}</b><span class="pay-tag ${r.cny ? "rmb" : ""}">${r.cny ? "人民币 ¥" + r.cny.toFixed(2) : r.pay}</span></span></div>`
-  ).join("") : `<div class="empty">今天还没有收款。</div>`;
+  const all = state.records.map((r, i) => ({r, i})).filter(x => (x.r.date || "") === today);
+  const rows = all.slice().reverse();          // 全部今日收款（面板内滚动，不再截断 8 条）
+  $("#recCount").textContent = all.length + " 笔";
+  $("#records").innerHTML = rows.length ? rows.map(({r, i}) => {
+    const pay = r.payType === "rmb" ? "人民币 ¥" + (+r.rmbActual || 0).toFixed(2)
+              : r.payType === "mixed" ? "混合"
+              : r.payType === "card" ? "刷卡" : "现金";
+    const unpaid = (+r.unpaid || 0) > 0.005 ? ` · 欠 ${money(r.unpaid)}` : "";
+    return `<div class="rec-item" data-idx="${i}" style="cursor:pointer" title="点开修改这条记录">
+      <span class="rec-l"><span class="rec-time">${esc(r.start || r.time || "")}</span><span class="rec-seat">${r.kind === "retail" ? "配件" : pad2(r.seatNo || r.seatId || 0) + " 号"}</span><span class="rec-type">${TYPE[r.type] || ""}</span></span>
+      <span class="rec-r"><b>${money(recCollected(r))}</b><span class="pay-tag ${r.payType === "rmb" ? "rmb" : ""}">${pay}${unpaid}</span></span></div>`;
+  }).join("") : `<div class="empty">今天还没有收款。</div>`;
 }
+$("#records").addEventListener("click", e => {
+  const it = e.target.closest("[data-idx]");
+  if (!it) return;
+  openRecordEdit(+it.dataset.idx);
+});
 
 /* 计时刷新 */
 function tick(){
@@ -694,70 +1418,1964 @@ $("#seats").addEventListener("click", e => {
   if (act === "pause"){ seat.accMs = elapsed(seat); seat.startAt = 0; seat.status = "paused"; touch(); }
   else if (act === "resume"){ seat.startAt = Date.now(); seat.status = "running"; touch(); }
   else if (act === "finish"){
+    // 天胡 act==="stop" → 结束（停表）；拼豆多一个 ended 状态承接「待结算」
     const ms = elapsed(seat);
-    seat.accMs = ms; seat.startAt = 0; seat.status = "paused";
-    openSettle(seat, ms);
-    renderSeats();
+    seat.accMs = ms; seat.startAt = 0; seat.status = "ended"; seat.endedAt = Date.now();
+    touch();
+    openSettleModal(seat.id, seat.endedAt - ms, seat.endedAt);
+  }
+  // 天胡 act==="unend"：撤销结束（回到计时中，计时接着走）
+  else if (act === "unend"){
+    if (seat.status !== "ended") return;
+    seat.startAt = Date.now() - (seat.accMs || 0);
+    seat.accMs = 0;
+    seat.status = "running";
+    seat.endedAt = 0;
+    touch();
+  }
+  // 天胡 act==="settle2"：待结算的工位重新打开结算
+  else if (act === "settle2"){
+    if (seat.status !== "ended") return;
+    openSettleModal(seat.id, (seat.endedAt || Date.now()) - (seat.accMs || 0), seat.endedAt || Date.now());
+  }
+  // 天胡 act==="carrypay"：补收上次未付（把这一单的时间设成 0 分钟，应收正好等于 carray）
+  else if (act === "carrypay"){
+    const cc = round2(Number(seat.carry) || 0);
+    if (cc <= 0.005) return;
+    const now = Date.now();
+    openSettleModal(seat.id, now, now);
+    // 天胡的做法是「把这场时间设成 0 分钟 → 台费 0」；拼豆有最低 30 分钟，
+    // 所以直接打标记：这一单只收欠款，不算台费。
+    settleData.noFee = true;
+    refreshSettle();
+    $("#sTitle").textContent = seatName(seat) + " · 补收上次未付";
+    $("#sInfo").innerHTML = "上次未付：<b style=\"color:#b45309\">" + money(cc) + "</b><br>" +
+      "<span style=\"color:var(--muted);font-size:12px\">收多少填多少；没收齐的会继续记在这个工位上，下次还能再补收 ✓</span>";
   }
 });
 
-/* 结算 */
-function openSettle(seat, ms){
-  const b = billFor(seat, ms);
-  const draft = {member:false, pay:"cash"};
-  const fx0 = +state.settings.fxRate || 0;
-  const build = () => {
-    const st = state.settings;
-    const disc = draft.member ? round2(b.amount * (+st.memberDiscount || 0) / 100) : 0;
-    const sub = round2(b.amount - disc);
-    const fee = draft.pay === "card" ? Math.ceil(sub * (+st.cardFee || 0) / 100 * 100) / 100 : 0;
-    const total = round2(sub + fee);
-    const rmb = draft.pay === "rmb" && fx0 > 0 ? round2(sub * fx0) : null;
-    $("#mBody").innerHTML = `
-      <div class="receipt">
-        <div class="rr"><span>工位</span><span>${pad2(seat.id)} 号 · ${TYPE[seat.type]}</span></div>
-        <div class="rr"><span>时长</span><span>${fmtDur(ms)}（${b.minutes} 分钟）</span></div>
-        <div class="rr"><span>${BILL[seat.billing]} · ${b.detail}</span><span>${money(b.amount)}</span></div>
-        ${disc ? `<div class="rr"><span>会员 ${st.memberDiscount}% 优惠</span><span>−${money(disc)}</span></div>` : ""}
-        ${fee ? `<div class="rr"><span>刷卡手续费 ${st.cardFee}%</span><span>${money(fee)}</span></div>` : ""}
-        ${rmb != null ? `<div class="rr"><span>汇率</span><span>1 AUD = ${fx0} CNY</span></div>
-        <div class="rr"><span>人民币应收</span><span>¥${rmb.toFixed(2)}</span></div>` : ""}
-        <div class="rr tot"><span>应收</span><span>${rmb != null ? "¥" + rmb.toFixed(2) : money(total)}</span></div>
-        ${rmb != null ? `<div class="rr" style="color:#9a8c7d;font-size:10.5px"><span>折合</span><span>${money(sub)}</span></div>` : ""}
-      </div>
-      <label class="checkline" style="margin-top:11px"><input type="checkbox" id="memChk" ${draft.member ? "checked" : ""}> 会员 ${state.settings.memberDiscount}% 优惠</label>
-      <div class="field" style="margin:9px 0 0"><label>怎么收</label>
-        <div class="payopts">
-          <button class="payopt ${draft.pay === "cash" ? "on" : ""}" data-pay="cash">💵 现金</button>
-          <button class="payopt ${draft.pay === "card" ? "on" : ""}" data-pay="card">💳 刷卡 +${state.settings.cardFee}%</button>
-          <button class="payopt ${draft.pay === "rmb" ? "on" : ""}" data-pay="rmb" ${fx0 > 0 ? "" : "disabled"}>人民币</button>
-        </div>
-      </div>
-      <div class="xsmall muted" style="margin-top:9px">收款后本单完成；板子和豆子不单独收费。${fx0 > 0 ? " 汇率由设置里的实时价 × 加点计算。" : ""}</div>`;
-    $("#mFoot").innerHTML = `<button class="btn" data-act="cancel">取消</button>
-      <button class="btn acc" data-act="ok">收款 ${rmb != null ? "¥" + rmb.toFixed(2) : money(total)}</button>`;
+/* ============================================================
+   结算 —— 照搬自 天胡麻将系统/app.js
+   源锚点（行号为天胡 app.js）：
+     ceil2/feeOf 403-410        hoursOf/fmtHours 1627-1650
+     fmtHS/fmtDate/format 1656-1712   settleBill 3151-3182
+     amountFromDue 3213-3226    partFee/partDue/partRmb/partPaid 3227-3253
+     settleTableCap 3277        syncParts 3279-3315
+     partRowHtml 3316-3386      renderPayRows/partsTotals/syncPartRowValues/refreshPartDues 3387-3437
+     handlePartEvent/Pick/Delete 3438-3544   refreshSettle 3545-3572
+     updateSettleTotals 3574-3730            短收选择/确认结算 3800-4058
+     syncEditTime 4076-4104     openRecordEdit 4105-4241   confirmRecordEdit 4274-4415
+     deleteRecordAt 4416        partsToText 15480-15509
+   适配点（除此之外逐行原样）：
+     state.tables[id]      → seatOf(id)（拼豆工位是数组）
+     TABLE_COUNT           → SEAT_COUNT = 10
+     state.history         → state.records
+     state.globalRate      → 拼豆 billFor() 锁定价（按小时 / 套餐 两套价）
+     state.feeRate         → state.settings.cardFee
+     state.fxRate          → state.settings.fxRate
+     fmtMoney              → money
+   未搬：会员余额抵扣、罚款、合并另一桌、按人分账
+   ============================================================ */
+const SEAT_COUNT = 10;
+function seatOf(id){ return state.seats[+id - 1]; }
+function seatName(t){ return pad2(t && t.id != null ? t.id : 0) + " 号工位"; }
+
+let billMode = "settle", editBillIdx = null, editBillRate = 0;
+let settleData = null, settleParts = [];
+/* ============================================================
+   「再点一次确认」统一机制（天胡 armGet/armSet 的升级版）
+   规则：任何需要点第二下才执行的操作，只要鼠标点到别的地方，就自动作废、恢复原文案。
+   实现：所有待确认按钮都挂 data-arm；全局捕获阶段的 click 发现点的不在它身上就复位。
+   ============================================================ */
+function armIsOn(n){ return !!(n && n.dataset && n.dataset.arm); }
+function armOn(n, label){
+  if (!n) return;
+  if (n.dataset.armText == null) n.dataset.armText = n.textContent;   // 记住原文，复位用
+  n.dataset.arm = "1";
+  if (label != null) n.textContent = label;
+}
+function armOff(n){
+  if (!armIsOn(n)) return;
+  if (n.dataset.armText != null){ n.textContent = n.dataset.armText; delete n.dataset.armText; }
+  delete n.dataset.arm;
+}
+function armOffAll(){ $$("[data-arm]").forEach(armOff); }
+document.addEventListener("click", e => {
+  $$("[data-arm]").forEach(n => { if (!n.contains(e.target)) armOff(n); });
+}, true);
+
+/* 天胡 app.js:403-410 —— 向上取整到分（对齐 Excel ROUNDUP） */
+function ceil2(x){
+  const v = Math.round((+x || 0) * 100 * 1e6) / 1e6;
+  return Math.ceil(v - 1e-6) / 100;
+}
+function feeOf(amount){ return ceil2((+amount || 0) * (+state.settings.cardFee || 0) / 100); }
+
+/* 天胡 app.js:1627-1650 */
+function hoursOf(ms){ return Math.max(1, Math.ceil(ms / 60000)) / 60; }
+function fmtHours(ms){ return (Math.round(hoursOf(ms) * 100) / 100).toFixed(2).replace(/\.?0+$/, ""); }
+
+/* 天胡 app.js:1656-1712 */
+function fmtDate(ts){ const d = new Date(ts); return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()); }
+function fmtHM(ts){ const d = new Date(ts); return pad2(d.getHours()) + ":" + pad2(d.getMinutes()); }
+function fmtEndHM(endTs, startTs){ return (fmtDate(endTs) === fmtDate(startTs) ? "" : "次日 ") + fmtHM(endTs); }
+function parseTimeStr(v){
+  if (!v) return null;
+  const m = String(v).match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
+  return m ? {h: +m[1], min: +m[2]} : null;
+}
+function combineToTs(dateStr, timeStr){
+  if (!dateStr || !timeStr) return null;
+  const dp = String(dateStr).split("-");
+  if (dp.length !== 3) return null;
+  const t = parseTimeStr(timeStr);
+  if (!t) return null;
+  const dt = new Date(+dp[0], +dp[1] - 1, +dp[2], t.h, t.min, 0, 0);
+  return isNaN(dt.getTime()) ? null : dt.getTime();
+}
+function payLabel(v){ return v === "cash" ? "现金" : (v === "rmb" ? "人民币" : (v === "mixed" ? "混合支付" : "刷卡")); }
+
+/* 天胡 billRate()/billFeeOf()：编辑模式按「记录当时的单价」重算 */
+function billRateNow(){
+  const t = seatOf(settleData.id);
+  if (billMode === "edit" && settleData.rec && settleData.rec.price){
+    const p = Object.assign({}, settleData.rec.price);
+    if (editBillRate > 0){
+      if (p.hourly != null) p.hourly = editBillRate;
+      if (p.package != null) p.package = editBillRate;
+    }
+    return p;
+  }
+  return Object.assign({}, t.price || snapshot(t.type, t.billing));
+}
+function currentBilling(){
+  return billMode === "edit" && settleData.rec ? (settleData.rec.billing || "hourly") : seatOf(settleData.id).billing;
+}
+function billFeeNow(ms){
+  // 工位已空闲（没有计费方式）→ 台费 0（补收上次未付就是这种情况）
+  if (!currentBilling()) return {minutes: 0, amount: 0, detail: "—"};
+  return billFor({billing: currentBilling(), type: seatOf(settleData.id).type, price: billRateNow()}, ms);
+}
+
+/* 天胡 settleBill() */
+function settleBill(){
+  const ms = Math.max(0, settleData.endTs - settleData.startTs);
+  const oEl = $("#sOther");
+  let manual = oEl ? (parseFloat(oEl.value) || 0) : 0;
+  if (manual < 0) manual = 0;
+  const accSum = itemsSum(settleExtras);
+  const other = round2(manual + accSum);
+  const bf = settleData.noFee ? {minutes: 0, amount: 0, detail: "—"} : billFeeNow(ms);
+  let tableFee = round2(bf.amount);
+  let disc = 0;
+  const dEl = $("#sMemDisc");
+  if (dEl && dEl.checked){
+    disc = round2(tableFee * (+state.settings.memberDiscount || 0) / 100);
+    tableFee = round2(tableFee - disc);
+  }
+  const tableAll = tableFee;
+  const full = round2(tableAll + other);
+  const carry = (billMode === "edit") ? 0 : round2(Number(seatOf(settleData.id).carry) || 0);
+  const total = round2(full + carry);
+  return {ms: ms, other: other, manual: manual, accSum: accSum, tableFee: tableFee, tableAll: tableAll, full: full,
+          carry: carry, total: total, disc: disc, perTable: 0, perShare: 0,
+          balanceUse: 0, due: total, detail: bf.detail, minutes: bf.minutes};
+}
+
+/* 天胡 amountFromDue()：从「实收（含手续费）」倒推手续费前的本金 */
+function amountFromDue(due){
+  const d = Number(due);
+  if (isNaN(d) || d <= 0) return 0;
+  const r = 1 + (+state.settings.cardFee || 0) / 100;
+  const base = Math.floor(d / r * 100) / 100;
+  for (let i = 0; i < 8; i++){
+    const a = round2(base + i / 100);
+    if (a < 0) continue;
+    if (round2(a + feeOf(a)) === round2(d)) return a;
+  }
+  return round2(d / r);
+}
+
+/* 天胡 partFee/partDue/partRmb/partPaid（会员分支未搬） */
+function partFee(p){
+  if (p.dueOverride != null && p.dueOverride !== ""){
+    const ov = Number(p.dueOverride);
+    if (!isNaN(ov)) return round2(Math.max(0, ov - (Number(p.amount) || 0)));
+  }
+  return p.payType === "card" ? feeOf(p.amount) : 0;
+}
+function partDue(p){ return round2(p.amount + partFee(p)); }
+function partRmb(p){
+  if (p.payType !== "rmb") return null;
+  if (p.rmb != null && p.rmb !== ""){ const v = parseFloat(p.rmb); if (!isNaN(v)) return round2(v); }
+  const fx = +state.settings.fxRate || 0;
+  return fx > 0 ? round2(p.amount * fx) : null;
+}
+function partPaid(p){ return partDue(p); }
+function settleTableCap(b){ return round2((b.tableAll || 0) + (b.carry || 0)); }
+
+/* 天胡 syncParts()：账单变了以后把明细调整到新的应收金额（只补最后一笔） */
+function syncParts(parts, due, other){
+  if (!parts.length){
+    const snackPart = round2(other || 0);
+    const tablePart = round2(due - snackPart);
+    if (snackPart > 0.005 && tablePart > 0.005){
+      parts.push({amount: tablePart, payType: "card", rmb: null, label: "台费"});
+      parts.push({amount: snackPart, payType: "card", rmb: null, label: "其它"});
+    } else {
+      parts.push({amount: round2(due), payType: "card", rmb: null, label: ""});
+    }
+    return;
+  }
+  let sum = 0;
+  for (let i = 0; i < parts.length; i++) sum = round2(sum + (Number(parts[i].amount) || 0));
+  const diff = round2(due - sum);
+  if (Math.abs(diff) < 0.005) return;
+  if (sum <= 0){
+    for (let i = 0; i < parts.length; i++) parts[i].amount = 0;
+    parts[0].amount = round2(due);
+    return;
+  }
+  let acc = 0;
+  for (let i = 0; i < parts.length; i++){
+    let v = (i === parts.length - 1) ? round2(due - acc) : round2(Number(parts[i].amount) || 0);
+    if (v < 0) v = 0;
+    parts[i].amount = v;
+    acc = round2(acc + v);
+  }
+}
+
+/* 天胡 partRowHtml()：单笔记账行（付款方式胶囊；会员分支未搬） */
+function partRowHtml(p, i){
+  const PAY_LABELS = [["cash", "💵 现金"], ["card", "💳 刷卡"], ["rmb", "🇨🇳 人民币"]];
+  let head = '<div class="cart-row pay-head">' +
+    '<span class="ph-label"' + (p.label ? ' style="font-weight:700;' + (p.label === "其它" ? "color:#b45309;" : "") + '"' : "") + ">" +
+      (p.label ? esc(p.label) : (i + 1)) + "</span>" +
+    '<input type="number" min="0" step="0.5" value="' + p.amount + '" data-part="amount" data-idx="' + i + '" class="ph-amount">' +
+    '<span class="part-due">' + money(partDue(p)) + "</span>" +
+    '<button type="button" class="mini" data-part="del" data-idx="' + i + '" title="删掉这笔">✕</button>' +
+    "</div>";
+  let meth = '<div class="cart-row pay-method"><span class="pm-k">怎么收</span>';
+  for (let mi = 0; mi < PAY_LABELS.length; mi++){
+    meth += '<button type="button" class="pay-pick' + (p.payType === PAY_LABELS[mi][0] ? " on" : "") +
+      '" data-part="pay" data-val="' + PAY_LABELS[mi][0] + '" data-idx="' + i + '">' + PAY_LABELS[mi][1] + "</button>";
+  }
+  meth += "</div>";
+
+  let detail = "";
+  const fx = +state.settings.fxRate || 0;
+  if (p.payType === "card"){
+    const auto = partDue({amount: p.amount, payType: "card", dueOverride: null});
+    const shown = (p.dueOverride != null && p.dueOverride !== "") ? p.dueOverride : "";
+    detail = '<div class="cart-row pay-detail">' +
+      '<span class="pm-k">刷卡</span>' +
+      '<span style="font-size:12.5px;color:var(--muted)">实收（含手续费）$</span>' +
+      '<input type="number" min="0" step="0.01" value="' + shown + '" placeholder="' + auto.toFixed(2) + '" ' +
+        'data-part="due" data-idx="' + i + '" ' +
+        'style="width:120px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;text-align:right;font-size:14px;font-weight:700;color:#1d4e89">' +
+      '<span style="font-size:11.5px;color:var(--muted)">填了会自动反推上面的本金　留空 = 按 ' + state.settings.cardFee + '% 自动（' + money(auto) + '）</span>' +
+      "</div>";
+  } else if (p.payType === "rmb"){
+    detail = '<div class="cart-row pay-detail">' +
+      '<span class="pm-k">人民币走</span>' +
+      '<button type="button" class="pay-pick ch-wx' + (p.rmbChannel !== "alipay" ? " on" : "") + '" data-part="rmbch" data-val="wx" data-idx="' + i + '">微信</button>' +
+      '<button type="button" class="pay-pick ch-ali' + (p.rmbChannel === "alipay" ? " on" : "") + '" data-part="rmbch" data-val="alipay" data-idx="' + i + '">支付宝</button>' +
+      '<span style="font-size:12.5px;color:var(--muted)">实收 ¥</span>' +
+      '<input type="number" min="0" step="1" value="' + (partRmb(p) != null ? partRmb(p) : "") + '" data-part="rmb" data-idx="' + i + '"' +
+        ' style="width:120px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;text-align:right;font-size:14px;font-weight:700;color:#1d4e89">' +
+      (fx > 0 ? '<span style="font-size:11.5px;color:var(--muted)">按汇率 ¥' + fx + '/澳币，改上面的澳币会自动重算</span>' : "") +
+      "</div>";
+  } else if (p.payType === "cash"){
+    detail = '<div class="cart-row pay-detail">' +
+      '<span class="pm-k">现金</span>' +
+      '<button type="button" class="pay-pick' + (p.cashChannel !== "transfer" ? " on" : "") + '" data-part="cashch" data-val="cash" data-idx="' + i + '">纸币</button>' +
+      '<button type="button" class="pay-pick' + (p.cashChannel === "transfer" ? " on" : "") + '" data-part="cashch" data-val="transfer" data-idx="' + i + '">转账</button>' +
+      '<span style="font-size:11.5px;color:var(--muted)">澳币，不收手续费</span>' +
+      "</div>";
+  }
+  return head + meth + detail;
+}
+
+function renderPayRows(containerId, parts){
+  let html = "";
+  for (let i = 0; i < parts.length; i++) html += partRowHtml(parts[i], i);
+  const el = document.getElementById(containerId);
+  if (el) el.innerHTML = html;
+}
+
+/* 天胡 partsTotals() */
+function partsTotals(parts){
+  const r = {collected: 0, feeSum: 0, cash: 0, card: 0, rmb: 0, rmbActual: 0, amountSum: 0};
+  for (let i = 0; i < parts.length; i++){
+    const p = parts[i], f = partFee(p), paid = partPaid(p);
+    r.collected = round2(r.collected + paid);
+    r.amountSum = round2(r.amountSum + (Number(p.amount) || 0));
+    r.feeSum = round2(r.feeSum + f);
+    if (p.payType === "cash") r.cash = round2(r.cash + paid);
+    else if (p.payType === "rmb"){
+      r.rmb = round2(r.rmb + paid);
+      const rv = partRmb(p);
+      if (rv != null) r.rmbActual = round2(r.rmbActual + rv);
+    } else r.card = round2(r.card + paid);
+  }
+  return r;
+}
+
+/* 天胡 syncPartRowValues()：只把数字写回输入框，不重建 DOM（保住焦点） */
+function syncPartRowValues(containerId, parts){
+  const wrap = document.getElementById(containerId);
+  if (!wrap) return;
+  const rows = wrap.querySelectorAll('input[data-part="amount"]');
+  if (rows.length !== parts.length){ renderPayRows(containerId, parts); return; }
+  for (let i = 0; i < parts.length; i++){
+    const a = wrap.querySelector('input[data-part="amount"][data-idx="' + i + '"]');
+    if (a && document.activeElement !== a) a.value = parts[i].amount;
+    const r = wrap.querySelector('input[data-part="rmb"][data-idx="' + i + '"]');
+    if (r && document.activeElement !== r) r.value = (partRmb(parts[i]) != null ? partRmb(parts[i]) : "");
+    const d = wrap.querySelector('input[data-part="due"][data-idx="' + i + '"]');
+    if (d && document.activeElement !== d){
+      d.value = (parts[i].dueOverride != null && parts[i].dueOverride !== "") ? parts[i].dueOverride : "";
+    }
+  }
+}
+
+function refreshPartDues(containerId, parts){
+  const wrap = document.getElementById(containerId);
+  if (!wrap) return;
+  const rows = wrap.querySelectorAll(".part-due");
+  for (let i = 0; i < rows.length && i < parts.length; i++) rows[i].textContent = money(partDue(parts[i]));
+}
+
+/* 天胡 handlePartEvent()（会员分支未搬） */
+function handlePartEvent(e, parts, containerId, onChange){
+  const el = e.target;
+  const idx = parseInt(el.getAttribute("data-idx"), 10);
+  if (isNaN(idx) || !parts[idx]) return;
+  const kind = el.getAttribute("data-part");
+  const fx = +state.settings.fxRate || 0;
+  if (kind === "amount"){
+    const v = parseFloat(el.value);
+    parts[idx].amount = (isNaN(v) || v < 0) ? 0 : round2(v);
+    parts[idx].dueOverride = null;
+    if (parts[idx].payType === "rmb"){
+      parts[idx].rmb = null;
+      const re = document.getElementById(containerId).querySelector('input[data-part="rmb"][data-idx="' + idx + '"]');
+      if (re){
+        if (fx > 0 && parts[idx].amount > 0) re.value = round2(parts[idx].amount * fx);
+        else re.value = "";
+      }
+    }
+    onChange();
+  } else if (kind === "due"){
+    const dv = parseFloat(el.value);
+    if (el.value === "" || isNaN(dv) || dv <= 0){
+      parts[idx].dueOverride = null;
+    } else {
+      parts[idx].dueOverride = round2(dv);
+      parts[idx].amount = amountFromDue(dv);
+      const aEl = document.getElementById(containerId).querySelector('input[data-part="amount"][data-idx="' + idx + '"]');
+      if (aEl && document.activeElement !== aEl) aEl.value = parts[idx].amount;
+    }
+    const dueSpan = document.getElementById(containerId).querySelectorAll(".part-due")[idx];
+    if (dueSpan) dueSpan.textContent = money(partDue(parts[idx]));
+    onChange();
+  } else if (kind === "rmb"){
+    parts[idx].rmb = el.value;
+    onChange();
+  } else if (kind === "rmbch"){
+    parts[idx].rmbChannel = el.value;
+    onChange();
+  } else if (kind === "cashch"){
+    parts[idx].cashChannel = el.value;
+    onChange();
+  }
+}
+
+/* 天胡 handlePartPick()：点胶囊按钮换付款方式 / 渠道 */
+function handlePartPick(e, parts, containerId, onChange){
+  if (!e.target || !e.target.closest) return false;
+  const btn = e.target.closest('button[data-part="pay"], button[data-part="cashch"], button[data-part="rmbch"]');
+  if (!btn) return false;
+  const idx = parseInt(btn.getAttribute("data-idx"), 10);
+  if (isNaN(idx) || !parts[idx]) return true;
+  const kind = btn.getAttribute("data-part");
+  const val = btn.getAttribute("data-val");
+  const pt = parts[idx];
+  if (kind === "cashch"){
+    pt.cashChannel = val;
+  } else if (kind === "rmbch"){
+    pt.rmbChannel = val;
+  } else {
+    pt.payType = val;
+    pt.rmb = null;
+    pt.dueOverride = null;
+    if (pt.payType === "rmb" && !pt.rmbChannel) pt.rmbChannel = "wx";
+    if (pt.payType === "cash" && !pt.cashChannel) pt.cashChannel = "cash";
+  }
+  renderPayRows(containerId, parts);
+  onChange();
+  return true;
+}
+
+function handlePartDelete(e, parts, containerId, onChange){
+  if (handlePartPick(e, parts, containerId, onChange)) return;
+  const btn = e.target.closest('button[data-part="del"]');
+  if (!btn) return;
+  const idx = parseInt(btn.getAttribute("data-idx"), 10);
+  if (isNaN(idx) || !parts[idx]) return;
+  if (parts.length <= 1){ parts[0].amount = 0; parts[0].rmb = null; }
+  else parts.splice(idx, 1);
+  renderPayRows(containerId, parts);
+  onChange();
+}
+
+/* 天胡 refreshSettle()（会员拆零分支未搬） */
+function refreshSettle(){
+  if (!settleData) return;
+  const b = settleBill();
+  syncParts(settleParts, b.due, b.other);
+  renderPayRows("sParts", settleParts);
+  updateSettleTotals(b);
+  renderAccPanel();
+}
+
+/* 天胡 updateSettleTotals()（会员 / 罚款 / 合并桌 / 快捷收款分支未搬） */
+function updateSettleTotals(b){
+  if (!settleData) return;
+  if (!b) b = settleBill();
+  const t = partsTotals(settleParts);
+  refreshPartDues("sParts", settleParts);
+  const fx = +state.settings.fxRate || 0;
+  const shortBy = round2(b.due - t.amountSum);
+  const overBy = round2(t.amountSum - b.due);
+
+  const bd = document.getElementById("sBreakdown");
+  if (bd) bd.innerHTML =
+    "台费：<b>" + money(b.tableFee) + "</b>" +
+    (b.disc > 0.005 ? "（会员优惠 −" + money(b.disc) + "）" : "") +
+    "<br>其它费用：<b>" + money(b.other) + "</b><br>" +
+    "本单全额：<b>" + money(b.full) + "</b>" +
+    (b.carry > 0.005 ? ("<br>上次未付（本工位）：<b style='color:#b45309'>+" + money(b.carry) + "</b>　合计 <b>" + money(b.total) + "</b>") : "") +
+    (t.feeSum > 0 ? ("<br>刷卡手续费（" + state.settings.cardFee + "%）：<b>" + money(t.feeSum) + "</b>") : "");
+
+  const ref = document.getElementById("sRef");
+  if (ref) ref.innerHTML =
+    "台费 <b>" + money(b.tableAll) + "</b>" +
+    (b.carry > 0.005 ? "　＋ 上次未付 <b>" + money(b.carry) + "</b>" : "") +
+    (b.other > 0.005 ? "　｜　其它费用 <b>" + money(b.other) + "</b>" : "");
+
+  const singlePart = (settleParts.length === 1) ? settleParts[0] : null;
+  let partsInfoHtml;
+  if (singlePart && singlePart.payType === "card"){
+    partsInfoHtml = "账单 <b>" + money(t.amountSum) + "</b> ＋ 刷卡手续费 <b>" + money(t.feeSum) +
+      "</b> ＝ 应收 <b>" + money(t.collected) + "</b>";
+  } else if (singlePart && singlePart.payType === "rmb" && t.rmbActual > 0){
+    partsInfoHtml = "账单 <b>" + money(t.amountSum) + "</b> ／ 应收 <b>¥" + t.rmbActual.toFixed(2) +
+      "</b>（≈ " + money(t.amountSum) + " 澳币）";
+  } else if (singlePart && singlePart.payType === "cash" && shortBy > 0.005){
+    partsInfoHtml = "账单 <b>" + money(t.amountSum) + "</b> ／ 现金少收 <b>−" + money(shortBy) +
+      "</b> ＝ 应收 <b>" + money(t.collected) + "</b>";
+  } else {
+    partsInfoHtml = "明细合计 <b>" + money(t.amountSum) + "</b> ／ 应收 <b>" + money(b.due) + "</b>" +
+      (Math.abs(shortBy) < 0.005
+        ? '　<span style="color:var(--ok)">✔ 一致</span>'
+        : (shortBy > 0
+            ? '　<span class="warn-note">还差 ' + money(shortBy) + "（见下方选择）</span>"
+            : '　<span class="warn-note">超出 ' + money(overBy) + "</span>"));
+  }
+  const pi2 = document.getElementById("sPartsInfo");
+  if (pi2) pi2.innerHTML = partsInfoHtml +
+    "<br>共收 <b>" + money(t.collected) + "</b>（刷卡 " + money(t.card) + " · 现金 " + money(t.cash) + " · 人民币 " + money(t.rmb) + "）" +
+    (billMode === "edit"
+      ? '<br><span style="color:var(--muted)">✎ 这是这条记录原来的收款明细：可改金额 / 换方式 / 点「+ 加一笔」拆开；改完点底部「保存修改」</span>'
+      : "");
+
+  const sw = document.getElementById("sShortWrap");
+  const cashOnly = t.cash > 0.005 && t.card < 0.005 && t.rmb < 0.005;
+  if (sw){
+    if (billMode === "edit"){
+      sw.style.display = "none";
+    } else if (shortBy > 0.005){
+      document.getElementById("sShortAmt").textContent = money(shortBy);
+      sw.style.display = "block";
+      if (!settleData.shortTouched) settleData.shortChoice = shortBy <= 1.0 ? "waive" : "carry";
+      const rads = document.querySelectorAll('input[name="sShort"]');
+      for (let ri = 0; ri < rads.length; ri++) rads[ri].checked = (rads[ri].value === settleData.shortChoice);
+    } else {
+      sw.style.display = "none";
+    }
+  }
+  const shHint = document.getElementById("sShortHint");
+  if (shHint){
+    if (shortBy > 0.005 && cashOnly && billMode !== "edit"){
+      shHint.style.display = "block";
+      shHint.innerHTML = "现金实收比账单少 <b>" + money(shortBy) + "</b>：如果是<b>抹零</b>，选「直接免除」；如果要下次一起收，选「记在这个工位上」。";
+    } else {
+      shHint.style.display = "none";
+      shHint.innerHTML = "";
+    }
+  }
+
+  const rmbEl = document.getElementById("sRmb");
+  if (rmbEl) rmbEl.innerHTML = fx > 0
+    ? "人民币参考：全额 <b>¥" + (b.full * fx).toFixed(2) + "</b>" +
+      (t.rmbActual > 0 ? "　人民币实收 <b>¥" + t.rmbActual.toFixed(2) + "</b>" : "") +
+      '<br><span style="font-size:11.5px">汇率 ¥' + fx + "/澳币" + (state.settings.fxUpdatedAt ? " · 更新于 " + state.settings.fxUpdatedAt : "") + "</span>"
+    : "请先在设置里填人民币汇率";
+
+  let allRmb = settleParts.length > 0;
+  for (let rp0 = 0; rp0 < settleParts.length; rp0++){
+    if (settleParts[rp0].payType !== "rmb"){ allRmb = false; break; }
+  }
+  const rmbShow = t.rmbActual > 0 ? t.rmbActual : (fx > 0 ? round2(t.collected * fx) : 0);
+  const grandEl = document.getElementById("sGrand");
+  const grandSubEl = document.getElementById("sGrandRmb");
+  if (allRmb && rmbShow > 0){
+    grandEl.textContent = "¥" + rmbShow.toFixed(2);
+    grandSubEl.textContent = "≈ " + money(t.collected) + " 澳币";
+  } else {
+    grandEl.textContent = money(t.collected);
+    grandSubEl.textContent = t.rmbActual > 0
+      ? ("其中人民币 ¥" + t.rmbActual.toFixed(2))
+      : (fx > 0 ? "≈ ¥" + (t.collected * fx).toFixed(2) + " 人民币" : "");
+  }
+
+  let remainHtml, cashMop = false;
+  if (singlePart && singlePart.payType === "card"){
+    remainHtml = "应收 <b>" + money(t.collected) + "</b>（含手续费 " + money(t.feeSum) + "）　实收 <b>" + money(t.collected) + "</b>";
+  } else if (singlePart && singlePart.payType === "rmb" && t.rmbActual > 0){
+    remainHtml = "应收 <b>¥" + t.rmbActual.toFixed(2) + "</b>（≈ " + money(t.amountSum) + " 澳币）　实收 <b>¥" + t.rmbActual.toFixed(2) + "</b>";
+  } else if (singlePart && singlePart.payType === "cash" && shortBy > 0.005){
+    cashMop = true;
+    remainHtml = "应收 <b>" + money(t.amountSum) + "</b>　实收 <b>" + money(t.collected) + "</b>　<span class='warn-note'>抹零 −" + money(shortBy) + "</span>";
+  } else if (allRmb && rmbShow > 0){
+    remainHtml = "应收 <b>" + money(b.due) + "</b> 澳币　实收 <b>¥" + rmbShow.toFixed(2) + "</b>";
+  } else {
+    remainHtml = "应收 <b>" + money(b.due) + "</b>　实收 <b>" + money(t.collected) + "</b>";
+  }
+  remainHtml += ((!cashMop && shortBy > 0.005) ? '　<span class="warn-note">未收 ' + money(shortBy) + "</span>" : "");
+  const remainEl = document.getElementById("sRemain");
+  if (remainEl) remainEl.innerHTML = remainHtml;
+}
+
+/* 天胡 resetSettleChrome() */
+function resetSettleChrome(){
+  const et = document.getElementById("sEditTime");
+  if (et) et.style.display = "none";
+  const rb = document.getElementById("sRmbBillBtn");
+  if (rb) rb.style.display = "";
+  const cf = document.getElementById("sConfirm");
+  if (cf) cf.textContent = "确认结算";
+  const del = document.getElementById("sEditDel");
+  if (del){
+    del.style.display = "none";
+    armOff(del);
+  }
+  const er = document.getElementById("sEditError");
+  if (er){ er.style.display = "none"; er.textContent = ""; }
+  const dw = document.getElementById("sDetailWrap"), dt = document.getElementById("sDetailToggle");
+  if (dw && dt){ dw.style.display = "none"; dt.textContent = "▸ 账单明细 / 汇率"; }
+  const mw = document.getElementById("sMoreWrap"), mb2 = document.getElementById("sMoreBtn");
+  if (mw && mb2){ mw.style.display = "none"; mb2.textContent = "⋯ 更多选项"; }
+  const dc = document.getElementById("sMemDisc");
+  if (dc) dc.checked = false;
+}
+
+/* 天胡 openSettleModal() */
+function openSettleModal(id, startTs, endTs){
+  const t = seatOf(id);
+  billMode = "settle";
+  editBillIdx = null;
+  editBillRate = 0;
+  settleData = {id: +id, startTs: startTs, endTs: endTs, shortChoice: "", shortTouched: false, rec: null, noFee: false};
+  const pct = document.getElementById("sMemDiscPct");
+  if (pct) pct.textContent = String(+state.settings.memberDiscount || 0);
+  const oEl = document.getElementById("sOther");
+  if (oEl) oEl.value = 0;
+  const dc = document.getElementById("sMemDisc");
+  if (dc) dc.checked = false;
+  /* 工位上挂着的配件带进结算 */
+  settleExtras = (Array.isArray(t.cart) ? t.cart : []).map(x => ({id:x.id, name:x.name, price:round2(+x.price || 0), qty:Math.max(0, +x.qty || 0)}));
+
+  const ms = Math.max(0, endTs - startTs);
+  const bf = billFeeNow(ms);
+  const carry = round2(Number(t.carry) || 0);
+  document.getElementById("sTitle").textContent = seatName(t) + " · 结算";
+  document.getElementById("sInfo").innerHTML =
+    "工位：<b>" + esc(seatName(t)) + "</b>　板型：<b>" + esc(TYPE[t.type] || "—") + "</b>　计费：<b>" + esc(BILL[t.billing] || "—") + "</b><br>" +
+    "日期：<b>" + esc(fmtDate(startTs)) + "</b><br>" +
+    "开始时间：<b>" + esc(fmtHM(startTs)) + "</b>　结束时间：<b>" + esc(fmtEndHM(endTs, startTs)) + "</b><br>" +
+    "时长：<b>" + fmtDur(ms) + "</b>　台费：<b>" + money(bf.amount) + "</b>　<span style='font-size:12px;color:var(--muted)'>" + esc(bf.detail) + "</span>" +
+    (carry > 0.005 ? "<br>上次未付（本工位）：<b style='color:#b45309'>" + money(carry) + "</b>" : "");
+
+  settleParts = [];
+  refreshSettle();
+  resetSettleChrome();
+  settleOverlay.classList.add("on");
+}
+
+/* 天胡 closeSettleModal() */
+function closeSettleModal(){
+  settleOverlay.classList.remove("on");
+  settleData = null;
+  settleParts = [];
+  billMode = "settle";
+  editBillIdx = null;
+  const del = document.getElementById("sEditDel");
+  if (del) armOff(del);
+}
+
+/* 天胡 partsToText()（会员分支未搬） */
+function partsToText(parts){
+  if (!parts || !parts.length) return "";
+  const out = [];
+  for (let i = 0; i < parts.length; i++){
+    const p = parts[i];
+    const amt = (p.due != null ? p.due : p.amount) || 0;
+    let t = payLabel(p.payType) + " " + money(round2(amt));
+    if (p.payType === "rmb" && p.rmb != null) t += " (¥" + round2(p.rmb).toFixed(2) + ")";
+    if (p.payType === "rmb" && p.rmbChannel === "alipay") t += "（支付宝）";
+    if (p.payType === "cash" && p.cashChannel === "transfer") t += "（转账）";
+    out.push(t);
+  }
+  return out.join(" ｜ ");
+}
+
+/* 天胡 showResult()：结算完成弹窗 */
+function showResult(rec){
+  const collected = (rec.collected != null) ? rec.collected : (rec.grand != null ? rec.grand : rec.total);
+  openModal((rec.name || "") + " 结算完成", () => {
+    let html = "";
+    html += "工位：<b>" + esc(rec.name || "") + "</b><br>";
+    if (rec.date) html += "日期：<b>" + esc(rec.date) + "</b>　" + esc(rec.start) + " – " + esc(rec.end) + "<br>";
+    if (rec.hours != null) html += "时长：<b>" + esc(rec.hours) + " 小时</b><br>";
+    html += "台费：<b>" + money(rec.tableFee != null ? rec.tableFee : rec.total) + "</b>" +
+      (rec.disc > 0.005 ? "（会员优惠 −" + money(rec.disc) + "）" : "") + "<br>";
+    html += "其它费用：<b>" + money(rec.other != null ? rec.other : 0) + "</b><br>";
+    if (rec.items && rec.items.length){
+      html += "配件：" + rec.items.map(x => esc(x.name) + " ×" + x.qty).join("、") +
+        "（<b>" + money(rec.accessories || 0) + "</b>）<br>";
+    }
+    html += "全额：<b>" + money(rec.total) + "</b><br>";
+    if (rec.fee > 0) html += "刷卡手续费（" + state.settings.cardFee + "%）：<b>" + money(rec.fee) + "</b><br>";
+    if (rec.parts && rec.parts.length){
+      html += "分账收款（" + rec.parts.length + " 笔）：<br>";
+      for (let i = 0; i < rec.parts.length; i++){
+        const p = rec.parts[i];
+        const lb = (p.label == null ? "" : String(p.label)).trim();
+        html += "　" + (lb ? esc(lb) + "：" : "") + "澳币 <b>" + money(Number(p.amount)) + "</b>　" + payLabel(p.payType);
+        if (p.payType === "rmb" && p.rmb != null) html += "　实收 <b>¥" + Number(p.rmb).toFixed(2) + "</b>";
+        else if (p.payType === "cash") html += "　实收 <b>" + money(Number(p.due)) + "</b>";
+        else html += "　应收 <b>" + money(Number(p.due)) + "</b>";
+        html += "<br>";
+      }
+    }
+    html += "实收合计：<b>" + money(collected) + "</b>" +
+      (rec.rmbActual > 0 ? "（其中人民币 <b>¥" + Number(rec.rmbActual).toFixed(2) + "</b>）" : "");
+    if (rec.waived > 0.005) html += "<br><span class='warn-note'>已免除 " + money(Number(rec.waived)) + "（抹零）</span>";
+    else if (rec.unpaid > 0.005) html += "<br><span class='warn-note'>这次没收到 " + money(Number(rec.unpaid)) + "，已记在这个工位上，下次一起结</span>";
+    if (rec.carryIn > 0.005) html += "<br>（本次已包含上次未付 " + money(Number(rec.carryIn)) + "）";
+    $("#mBody").innerHTML = `<div class="receipt" style="line-height:1.9">${html}</div>
+      <div class="xsmall muted" style="margin-top:8px;text-align:left">这条记录可以在右侧「今日收款」里点开修改或删除。</div>`;
+    $("#mFoot").innerHTML = `<button class="btn acc" data-act="ok">完成</button>`;
+  }, e => {
+    if (e.target.closest('[data-act="ok"]')) closeModal();
+  });
+}
+
+/* 天胡 确认结算（会员扣款 / 合并桌 / 罚款分支未搬） */
+function confirmSettle(){
+  if (!settleData) return;
+  if (billMode === "edit"){ confirmRecordEdit(); return; }
+  const t = seatOf(settleData.id);
+  const b = settleBill();
+  const other = b.other;
+  const ms = Math.max(0, settleData.endTs - settleData.startTs);
+
+  let collected = 0, feeSum = 0, cashSum = 0, cardSum = 0, rmbSum = 0, rmbActual = 0;
+  const partsRec = [], paySet = {};
+  for (let k = 0; k < settleParts.length; k++){
+    const pt = settleParts[k];
+    const due = partDue(pt), f = partFee(pt), paid = partPaid(pt);
+    const rv = partRmb(pt);
+    collected = round2(collected + paid);
+    feeSum = round2(feeSum + f);
+    if (pt.payType === "cash") cashSum = round2(cashSum + paid);
+    else if (pt.payType === "rmb"){ rmbSum = round2(rmbSum + paid); if (rv != null) rmbActual = round2(rmbActual + rv); }
+    else cardSum = round2(cardSum + paid);
+    paySet[pt.payType] = true;
+    partsRec.push({
+      amount: round2(pt.amount), payType: pt.payType, fee: f, due: due,
+      rmb: pt.payType === "rmb" ? rv : null,
+      rmbChannel: pt.payType === "rmb" ? (pt.rmbChannel || "wx") : "",
+      cashChannel: pt.payType === "cash" ? (pt.cashChannel || "cash") : "",
+      label: pt.label || "",
+      dueOverride: pt.dueOverride != null ? pt.dueOverride : null
+    });
+  }
+  const payKeys = Object.keys(paySet);
+  const payType = payKeys.length === 0 ? "cash" : (payKeys.length === 1 ? payKeys[0] : "mixed");
+  const shortBy = round2(b.due - partsTotals(settleParts).amountSum);
+
+  const rec = {
+    id: nextId(),
+    seatNo: settleData.id,
+    name: seatName(t),
+    type: t.type,
+    billing: t.billing,
+    price: billRateNow(),
+    startTs: settleData.startTs,
+    endTs: settleData.endTs,
+    date: fmtDate(settleData.startTs),
+    realDate: fmtDate(settleData.startTs),
+    start: fmtHM(settleData.startTs),
+    end: fmtEndHM(settleData.endTs, settleData.startTs),
+    hours: fmtHours(ms),
+    tableFee: b.tableFee,
+    tableAll: b.tableAll,
+    disc: b.disc || 0,
+    other: other,
+    total: b.full,
+    fee: feeSum,
+    grand: round2(b.full + feeSum),
+    collected: collected,
+    cashSum: cashSum,
+    cardSum: cardSum,
+    rmbSum: rmbSum,
+    rmbActual: rmbActual,
+    perTable: b.perTable,
+    unpaid: shortBy > 0.005 ? shortBy : 0,
+    carryIn: b.carry,
+    parts: partsRec,
+    payType: payType,
+    memberId: "",
+    memberName: "",
+    balanceUsed: 0,
+    memberUsed: 0,
+    mergedTable: "",
+    mergedSum: 0,
+    time: new Date().toLocaleString("zh-CN"),
+    range: fmtHM(settleData.startTs) + " – " + fmtHM(settleData.endTs)
   };
-  openModal(`结算 · ${pad2(seat.id)} 号工位`, build, e => {
-    if (e.target.id === "memChk"){ draft.member = e.target.checked; build(); return; }
-    const pay = e.target.closest("[data-pay]");
-    if (pay){ draft.pay = pay.dataset.pay; build(); return; }
-    const act = e.target.closest("[data-act]");
-    if (!act) return;
-    if (act.dataset.act === "cancel"){ seat.status = "paused"; closeModal(); renderSeats(); return; }
-    if (act.dataset.act === "ok"){
-      const st = state.settings;
-      const disc = draft.member ? round2(b.amount * (+st.memberDiscount || 0) / 100) : 0;
-      const sub = round2(b.amount - disc);
-      const fee = draft.pay === "card" ? Math.ceil(sub * (+st.cardFee || 0) / 100 * 100) / 100 : 0;
-      const total = round2(sub + fee);
-      const rmb = draft.pay === "rmb" && fx0 > 0 ? round2(sub * fx0) : null;
-      const payLabel = draft.pay === "rmb" ? "人民币" : draft.pay === "card" ? "刷卡" : "现金";
-      state.records.push({id:nextId(), seatId:seat.id, type:seat.type, amount:total, cny:rmb, fx:rmb != null ? fx0 : null, pay:payLabel, minutes:b.minutes, time:nowTime(), date:todayKey()});
-      Object.assign(seat, {status:"idle", type:null, billing:null, startAt:0, accMs:0, price:null, last:{amount:total, time:nowTime()}});
-      touch(); closeModal(); toast(`${pad2(seat.id)} 号收款 ${rmb != null ? "¥" + rmb.toFixed(2) : money(total)}，本单完成`);
+  rec.payDetail = partsToText(partsRec);
+  rec.amount = rec.grand;      // 兼容旧的统计/列表口径
+  rec.kind = "station";
+  rec.items = settleExtras.map(x => ({id:x.id, name:x.name, price:round2(+x.price || 0), qty:x.qty}));
+  rec.accessories = itemsSum(rec.items);
+  state.records.push(rec);
+  /* 配件库存只在落单时扣：结算 / 零售 / 改单补差 */
+  applyItemsStock(rec.items, -1, "sale");
+
+  const waived = shortBy > 0.005 && settleData.shortChoice === "waive";
+  Object.assign(t, {
+    status: "idle", type: null, billing: null, startAt: 0, accMs: 0, endedAt: 0, price: null,
+    last: {amount: collected, time: nowTime()}, cart: []
+  });
+  t.carry = (shortBy > 0.005 && !waived) ? shortBy : 0;
+  rec.waived = waived ? shortBy : 0;
+
+  touch();
+  closeSettleModal();
+  showResult(rec);
+}
+
+/* 天胡 hideBillEditError()/showBillEditError() */
+function hideBillEditError(){
+  const el = document.getElementById("sEditError");
+  if (!el) return;
+  el.textContent = "";
+  el.style.display = "none";
+}
+function showBillEditError(msg){
+  const el = document.getElementById("sEditError");
+  if (!el) return;
+  el.textContent = msg;
+  el.style.display = "block";
+  try { el.scrollIntoView({block: "nearest"}); } catch (e){}
+}
+
+/* 天胡 syncEditTime()：把「日期 + 开始/结束时间」写回 settleData（结束早于开始 = 次日） */
+function syncEditTime(){
+  if (!settleData) return false;
+  const dstr = document.getElementById("sEditDate").value;
+  const sTxt = document.getElementById("sEditStart").value;
+  const eTxt = document.getElementById("sEditEnd").value;
+  let s = combineToTs(dstr, sTxt);
+  let e = combineToTs(dstr, eTxt);
+  let nextDay = false;
+  // 天胡是 e <= s 判定次日；拼豆的计费有「最低 30 分钟」，不满 1 分钟的会话
+  // 起止时间会落在同一分钟，用 <= 会被算成 24 小时 → 这里改为严格小于。
+  if (s != null && e != null && e < s){
+    e = combineToTs(fmtDate(s + 86400000), eTxt);
+    nextDay = true;
+  }
+  const hint = document.getElementById("sEditHint");
+  const r = parseFloat(document.getElementById("sEditRate").value);
+  editBillRate = (isNaN(r) || r < 0) ? 0 : r;
+  if (s == null || e == null){
+    if (hint) hint.innerHTML = "⚠️ 时间没填全：日期 + 开始/结束时间（结束早于开始时按<b>次日</b>算）";
+    return false;
+  }
+  settleData.startTs = s;
+  settleData.endTs = e;
+  const ms = e - s;
+  if (hint){
+    hint.innerHTML = "时长 <b>" + fmtDur(ms) + "</b> · 台费 <b>" + money(billFeeNow(ms).amount) + "</b>" +
+      ' <span style="color:var(--muted)">（单价 ' + money(editBillRate) + (currentBilling() === "hourly" ? "/小时" : " 套餐") + "）</span>" +
+      (nextDay ? '　<span style="color:#b45309">结束按次日 ' + esc(eTxt) + " 算</span>" : "");
+  }
+  return true;
+}
+
+/* 天胡 openRecordEdit()（会员 / 合并桌 / 按人分账分支未搬） */
+function openRecordEdit(idx){
+  const rec = state.records[idx];
+  if (!rec) return;
+  if (rec.kind === "retail"){ toast("零售单不支持改单；要改就到「配件」页把这单删掉重新卖"); return; }
+  let sTs = Number(rec.startTs) || 0, eTs = Number(rec.endTs) || 0;
+  if (!sTs || !eTs || eTs <= sTs){ sTs = Date.now() - 3600000; eTs = Date.now(); }
+
+  billMode = "edit";
+  editBillIdx = idx;
+  const seatNo = parseInt(rec.seatNo || rec.seatId, 10) || 1;
+  settleData = {id: seatNo, startTs: sTs, endTs: eTs, shortChoice: "", shortTouched: false, rec: rec, billing: rec.billing || "hourly"};
+
+  const sel = document.getElementById("sEditTable");
+  if (sel){
+    let opts = "";
+    for (let i = 1; i <= SEAT_COUNT; i++) opts += '<option value="' + i + '">' + pad2(i) + " 号工位</option>";
+    sel.innerHTML = opts;
+    sel.value = String(seatNo);
+  }
+
+  document.getElementById("sEditDate").value = fmtDate(sTs);
+  document.getElementById("sEditStart").value = fmtHM(sTs);
+  document.getElementById("sEditEnd").value = fmtHM(eTs);
+  const hrs = hoursOf(Math.max(0, eTs - sTs));
+  const pk = rec.price || {};
+  const recBilling = rec.billing || "hourly";
+  editBillRate = (recBilling === "hourly" ? Number(pk.hourly) : Number(pk.package)) || 0;
+  if (!(editBillRate > 0)){
+    editBillRate = (hrs > 0 && Number(rec.tableFee) > 0) ? Math.round(Number(rec.tableFee) / hrs * 100) / 100 : 0;
+  }
+  document.getElementById("sEditRate").value = editBillRate;
+  const unit = document.getElementById("sEditRateUnit");
+  if (unit) unit.textContent = recBilling === "hourly" ? "$/小时（当时的单价）" : "$/套餐（当时的套餐价）";
+
+  /* 这条记录原来的配件明细；其它费用里要把配件小计拆出来，避免重复算 */
+  settleExtras = normItems(rec.items || []).map(x => ({id:x.id, name:x.name, price:x.price, qty:x.qty}));
+  const oEl = document.getElementById("sOther");
+  if (oEl) oEl.value = round2(Math.max(0, (Number(rec.other) || 0) - itemsSum(settleExtras)));
+  const dc = document.getElementById("sMemDisc");
+  if (dc) dc.checked = Number(rec.disc) > 0.005;
+  const pct = document.getElementById("sMemDiscPct");
+  if (pct) pct.textContent = String(+state.settings.memberDiscount || 0);
+
+  document.getElementById("sTitle").textContent = (rec.name || (pad2(seatNo) + " 号工位")) + " · 修改结算";
+  document.getElementById("sInfo").innerHTML =
+    "⚠️ 正在修改 <b>" + esc(rec.date || "") + "</b> 这条记录：保存后<b>原地替换</b>（不会新增一条）<br>" +
+    '<span style="font-size:12px;color:var(--muted)">改完点下面「保存修改」；要重新算就改时间/单价，只改某一部分就只动那一项。</span>';
+
+  settleParts = [];
+  if (rec.parts && rec.parts.length){
+    for (let k = 0; k < rec.parts.length; k++){
+      const rp = rec.parts[k];
+      settleParts.push({
+        amount: Number(rp.amount != null ? rp.amount : rp.due) || 0,
+        payType: rp.payType || "card",
+        rmb: rp.rmb != null ? rp.rmb : null,
+        label: rp.label || "",
+        dueOverride: rp.dueOverride != null ? rp.dueOverride : null,
+        rmbChannel: rp.rmbChannel || "",
+        cashChannel: rp.cashChannel || ""
+      });
+    }
+  } else {
+    const total0 = Number(rec.collected != null ? rec.collected : (rec.grand != null ? rec.grand : rec.total)) || 0;
+    const pt0 = (rec.payType === "mixed") ? "card" : (rec.payType || "card");
+    settleParts.push({amount: total0, payType: pt0, rmb: (pt0 === "rmb" ? (rec.rmbActual || null) : null), label: ""});
+  }
+
+  const et = document.getElementById("sEditTime");
+  if (et) et.style.display = "block";
+  const cf = document.getElementById("sConfirm");
+  if (cf) cf.textContent = "保存修改";
+  const del = document.getElementById("sEditDel");
+  if (del){ del.style.display = "block"; armOff(del); }
+  hideBillEditError();
+
+  syncEditTime();
+  refreshSettle();
+  const dw = document.getElementById("sDetailWrap"), dt = document.getElementById("sDetailToggle");
+  if (dw && dt){ dw.style.display = "none"; dt.textContent = "▸ 账单明细 / 汇率"; }
+  const mw = document.getElementById("sMoreWrap"), mb2 = document.getElementById("sMoreBtn");
+  if (mw && mb2){ mw.style.display = "none"; mb2.textContent = "⋯ 更多选项"; }
+  settleOverlay.classList.add("on");
+}
+
+/* 天胡 confirmRecordEdit()（会员分支未搬；id 原样保留） */
+function confirmRecordEdit(){
+  const idx = editBillIdx;
+  const rec = (idx != null) ? state.records[idx] : null;
+  if (!rec) return;
+  if (!syncEditTime()){ showBillEditError("请填写有效的时间（日期 + 开始/结束；结束早于开始时按次日算）"); return; }
+  const b = settleBill();
+  const t = partsTotals(settleParts);
+  if (!settleParts.length || t.amountSum <= 0.005){
+    showBillEditError("请至少填一笔收款（金额要大于 0）");
+    return;
+  }
+  const shortBy = round2(b.due - t.amountSum);
+
+  let collected = 0, feeSum = 0, cashSum = 0, cardSum = 0, rmbSum = 0, rmbActual = 0;
+  const partsRec = [], paySet = {};
+  for (let i = 0; i < settleParts.length; i++){
+    const pt = settleParts[i];
+    const due = partDue(pt), f = partFee(pt), paid = partPaid(pt);
+    const rv = partRmb(pt);
+    collected = round2(collected + paid);
+    feeSum = round2(feeSum + f);
+    if (pt.payType === "cash") cashSum = round2(cashSum + paid);
+    else if (pt.payType === "rmb"){ rmbSum = round2(rmbSum + paid); if (rv != null) rmbActual = round2(rmbActual + rv); }
+    else cardSum = round2(cardSum + paid);
+    paySet[pt.payType] = true;
+    partsRec.push({
+      amount: round2(pt.amount), payType: pt.payType, fee: f, due: due,
+      rmb: pt.payType === "rmb" ? rv : null,
+      rmbChannel: pt.payType === "rmb" ? (pt.rmbChannel || "wx") : "",
+      cashChannel: pt.payType === "cash" ? (pt.cashChannel || "cash") : "",
+      label: pt.label || "",
+      dueOverride: pt.dueOverride != null ? pt.dueOverride : null
+    });
+  }
+  const payKeys = Object.keys(paySet);
+  const payType = payKeys.length === 0 ? "cash" : (payKeys.length === 1 ? payKeys[0] : "mixed");
+
+  const seatNo = parseInt(document.getElementById("sEditTable").value, 10) || 1;
+  const s = settleData.startTs, e = settleData.endTs;
+  if (!rec.id) rec.id = nextId();
+  rec.seatNo = seatNo;
+  rec.name = seatName(seatOf(seatNo));
+  rec.startTs = s;
+  rec.endTs = e;
+  rec.date = fmtDate(s);
+  rec.realDate = fmtDate(s);
+  rec.start = fmtHM(s);
+  rec.end = fmtEndHM(e, s);
+  rec.hours = fmtHours(e - s);
+  rec.range = fmtHM(s) + " – " + fmtHM(e);
+  rec.tableFee = b.tableFee;
+  rec.tableAll = b.tableAll;
+  rec.disc = b.disc || 0;
+  rec.other = b.other;
+  rec.total = b.full;
+  rec.fee = feeSum;
+  rec.grand = round2(b.full + feeSum);
+  rec.collected = collected;
+  rec.cashSum = cashSum;
+  rec.cardSum = cardSum;
+  rec.rmbSum = rmbSum;
+  rec.rmbActual = rmbActual;
+  rec.perTable = b.perTable;
+  rec.unpaid = shortBy > 0.005 ? shortBy : 0;
+  rec.parts = partsRec;
+  rec.payType = payType;
+  /* 配件：写回这条记录，库存按新旧差额补扣 / 归还 */
+  const oldItems = normItems(rec.items || []);
+  const newItems = settleExtras.map(x => ({id:x.id, name:x.name, price:round2(+x.price || 0), qty:x.qty}));
+  rec.items = newItems;
+  rec.accessories = itemsSum(newItems);
+  rec.kind = rec.kind === "retail" ? "retail" : "station";
+  stockDiff(oldItems, newItems, "edit");
+  rec.price = billRateNow();
+  rec.billing = currentBilling();
+  rec.time = new Date().toLocaleString("zh-CN");
+  rec.payDetail = partsToText(partsRec);
+  rec.amount = rec.grand;
+
+  touch();
+  closeSettleModal();
+  toast("已保存修改：" + rec.name + " " + rec.range + " · 实收 " + money(rec.collected));
+}
+
+/* 天胡 deleteRecordAt()：两下确认 */
+function deleteRecordAt(idx){
+  const rec = state.records[idx];
+  if (!rec) return;
+  const btn = document.getElementById("sEditDel");
+  if (!armIsOn(btn)){
+    armOn(btn, "再点一次确认删除");       // 点到别处会自动作废
+    return;
+  }
+  armOff(btn);
+  applyItemsStock(normItems(rec.items || []), +1, "delete");
+  state.records.splice(idx, 1);
+  touch();
+  closeSettleModal();
+  toast("已删除这条记录");
+}
+
+/* ---------- 结算弹窗事件（对应天胡 app.js:3800-3858 那段 addEventListener） ---------- */
+const settleOverlay = document.getElementById("settleOverlay");
+
+document.getElementById("sConfirm").addEventListener("click", () => {
+  if (!settleData) return;
+  if (billMode === "edit") confirmRecordEdit();
+  else confirmSettle();
+});
+document.getElementById("sCancel").addEventListener("click", closeSettleModal);
+settleOverlay.addEventListener("click", e => { if (e.target === settleOverlay) closeSettleModal(); });
+document.getElementById("sEditDel").addEventListener("click", () => { if (editBillIdx != null) deleteRecordAt(editBillIdx); });
+document.getElementById("sDetailToggle").addEventListener("click", () => {
+  const w = document.getElementById("sDetailWrap"), b = document.getElementById("sDetailToggle");
+  const open = w.style.display !== "block";
+  w.style.display = open ? "block" : "none";
+  b.textContent = (open ? "▾" : "▸") + " 账单明细 / 汇率";
+});
+document.getElementById("sMoreBtn").addEventListener("click", () => {
+  const w = document.getElementById("sMoreWrap"), b = document.getElementById("sMoreBtn");
+  const open = w.style.display !== "block";
+  w.style.display = open ? "block" : "none";
+  b.textContent = (open ? "▾" : "⋯") + " 更多选项";
+});
+document.getElementById("sOther").addEventListener("input", () => { if (settleData) refreshSettle(); });
+document.getElementById("sMemDisc").addEventListener("change", () => { if (settleData) refreshSettle(); });
+document.getElementById("sAddRow").addEventListener("click", () => {
+  const b = settleBill();
+  const t = partsTotals(settleParts);
+  const left = round2(b.due - t.amountSum);
+  settleParts.push({amount: left > 0.005 ? left : 0, payType: "card", rmb: null, label: ""});
+  renderPayRows("sParts", settleParts);
+  updateSettleTotals();
+});
+function setSettleParts(parts){
+  settleParts = parts;
+  renderPayRows("sParts", settleParts);
+  updateSettleTotals();
+}
+document.getElementById("sEven").addEventListener("click", () => {
+  const b = settleBill();
+  const n = settleParts.length || 1;
+  const each = Math.floor(b.due / n * 100) / 100;
+  const parts = [];
+  let acc = 0;
+  for (let i = 0; i < n; i++){
+    const amt = (i === n - 1) ? round2(b.due - acc) : each;
+    acc = round2(acc + amt);
+    parts.push({amount: amt, payType: (settleParts[i] && settleParts[i].payType) || "card", rmb: null, label: ""});
+  }
+  setSettleParts(parts);
+});
+document.getElementById("sAllOne").addEventListener("click", () => {
+  const b = settleBill();
+  setSettleParts([{amount: b.due, payType: "card", rmb: null, label: ""}]);
+});
+document.getElementById("sShortWrap").addEventListener("change", e => {
+  if (e.target.name !== "sShort") return;
+  settleData.shortChoice = e.target.value;
+  settleData.shortTouched = true;
+  updateSettleTotals();
+});
+document.getElementById("sParts").addEventListener("input", e => handlePartEvent(e, settleParts, "sParts", updateSettleTotals));
+document.getElementById("sParts").addEventListener("change", e => handlePartEvent(e, settleParts, "sParts", updateSettleTotals));
+document.getElementById("sParts").addEventListener("click", e => handlePartDelete(e, settleParts, "sParts", updateSettleTotals));
+
+/* 编辑模式：时间 / 单价 / 工位 改动即重算 */
+["sEditDate", "sEditStart", "sEditEnd", "sEditRate"].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener("input", () => { if (settleData && billMode === "edit"){ syncEditTime(); refreshSettle(); } });
+});
+document.getElementById("sEditTable").addEventListener("change", e => {
+  if (!settleData || billMode !== "edit") return;
+  settleData.id = parseInt(e.target.value, 10) || 1;
+  syncEditTime();
+  refreshSettle();
+});
+
+/* 今日收款列表：点一条 → 修改这条记录 */
+function recCollected(r){
+  if (r.collected != null) return +r.collected || 0;
+  if (r.grand != null) return +r.grand || 0;
+  return +r.amount || 0;
+}
+function recGrand(r){
+  if (r.grand != null) return +r.grand || 0;
+  return +r.amount || 0;
+}
+
+/* ============================================================
+   页签 / 结算记录全表 / 统计 / 员工
+   结构照搬自 天胡麻将系统；口径按拼豆重定义（没有会员、零食、鸭嘴兽、罚款）
+   锚点：页签 mahjong-timer.html:80-85  员工 :388-456  统计 :457-489
+        分组分页 groupByDate(2017) renderHistory(2113)
+        统计 statsRange(15572) statsCalc(15606) renderStats(15868) statsCopyText(16351)
+        员工 attHours(13137) 打卡(13632-13760) splitShift(15019) wagePeriod(15072)
+             busyOf(15110) dayBizOf(15090) wageCalc(15188) renderWages(15230)
+   ============================================================ */
+const TAB_NAMES = ["board", "stats", "staff", "retail"];
+let currentTab = "board";
+function switchTab(name){
+  if (TAB_NAMES.indexOf(name) < 0) name = "board";
+  currentTab = name;
+  TAB_NAMES.forEach(t => { const p = document.getElementById("pane-" + t); if (p) p.hidden = (t !== name); });
+  $$("#tabs .tab").forEach(b => b.classList.toggle("on", b.dataset.tab === name));
+  armOffAll();
+  if (name === "board") requestAnimationFrame(syncAsideHeight);
+  if (name === "stats") renderStats();
+  else if (name === "staff") renderStaff();
+  else if (name === "retail") renderRetail();
+  else renderHistory();
+}
+$("#tabs").addEventListener("click", e => { const b = e.target.closest("[data-tab]"); if (b) switchTab(b.dataset.tab); });
+
+function weekdayCn(dateStr){
+  const d = new Date(String(dateStr) + "T12:00:00");
+  return isNaN(d.getTime()) ? "" : "日一二三四五六"[d.getDay()];
+}
+function monthRangeOf(val){
+  const m = /^(\d{4})-(\d{2})$/.exec(String(val || ""));
+  if (!m) return null;
+  const y = +m[1], mm = +m[2];
+  const from = y + "-" + pad2(mm) + "-01";
+  const last = new Date(y, mm, 0).getDate();
+  return { from: from, to: y + "-" + pad2(mm) + "-" + pad2(last) };
+}
+function weekRangeOf(val){
+  const m = /^(\d{4})-W(\d{2})$/.exec(String(val || ""));
+  if (!m) return null;
+  const y = +m[1], w = +m[2];
+  const jan4 = new Date(y, 0, 4);
+  const mon1 = new Date(y, 0, 4 - ((jan4.getDay() + 6) % 7));
+  const mon = new Date(mon1.getFullYear(), mon1.getMonth(), mon1.getDate() + (w - 1) * 7);
+  const sun = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 6);
+  return { from: fmtDate(mon.getTime()), to: fmtDate(sun.getTime()), mon: mon, sun: sun };
+}
+function thisWeekVal(){
+  const d = new Date();
+  const t = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  t.setDate(t.getDate() + 3 - ((t.getDay() + 6) % 7));
+  const wk1 = new Date(t.getFullYear(), 0, 4);
+  const n = 1 + Math.round(((t - wk1) / 86400000 - 3 + ((wk1.getDay() + 6) % 7)) / 7);
+  return t.getFullYear() + "-W" + pad2(n);
+}
+
+/* ---------- 结算记录全表（按日期分组 + 小计 + 分页） ---------- */
+let histPage = 0, histFilter = "";
+const HIST_PER = 60;
+const recIndex = new Map();      // 记录对象 → 在 state.records 里的下标（点击编辑用）
+
+function histGroups(){
+  const kw = String(histFilter || "").trim().toLowerCase();
+  const items = [];
+  state.records.forEach((r, i) => recIndex.set(r.id, i));
+  state.records.forEach((r, i) => {
+    if (kw){
+      const hay = [r.date, r.name, r.start, r.end, r.seatNo, r.payType,
+                   (r.items || []).map(x => x.name).join(" "),
+                   money(recCollected(r)), money(recGrand(r)), String(+r.hours || "")].join(" ").toLowerCase();
+      if (hay.indexOf(kw) < 0) return;
+    }
+    items.push({ r: r, i: i, id: r.id });
+  });
+  items.sort((a, b) => {
+    const ad = a.r.date || "", bd = b.r.date || "";
+    if (ad !== bd) return ad < bd ? 1 : -1;
+    return (+b.r.endTs || 0) - (+a.r.endTs || 0);
+  });
+  const groups = [];
+  let cur = null;
+  items.forEach(x => {
+    const d = x.r.date || "—";
+    if (!cur || cur.date !== d){ cur = { date: d, items: [] }; groups.push(cur); }
+    cur.items.push(x);
+  });
+  return groups;
+}
+function histPages(groups){
+  const pages = [];
+  let cur = [], n = 0;
+  groups.forEach(g => {
+    if (n >= HIST_PER && cur.length){ pages.push(cur); cur = []; n = 0; }
+    cur.push(g); n += g.items.length;
+  });
+  if (cur.length) pages.push(cur);
+  return pages.length ? pages : [[]];
+}
+function renderHistory(){
+  const wrap = document.getElementById("histWrap");
+  if (!wrap) return;
+  const cnt = document.getElementById("histCount");
+  if (cnt) cnt.textContent = state.records.length + " 笔";
+  if (!state.records.length){
+    wrap.innerHTML = '<div class="empty">还没有结算记录。结束计时并确认结算后会出现在这里。</div>';
+    const pg0 = document.getElementById("histPager"); if (pg0) pg0.innerHTML = "";
+    return;
+  }
+  const groups = histGroups();
+  const pages = histPages(groups);
+  histPage = Math.max(0, Math.min(histPage, pages.length - 1));
+  const pageGroups = pages[histPage];
+  if (!groups.length){
+    wrap.innerHTML = '<div class="empty">没有匹配的记录。</div>';
+    const pg1 = document.getElementById("histPager"); if (pg1) pg1.innerHTML = "";
+    return;
+  }
+  let html = '<table class="rt"><thead><tr>' +
+    '<th>日期 · 时间</th><th>工位</th><th>板型</th><th>时长</th>' +
+    '<th class="num">台费</th><th class="num">其它</th><th class="num">手续费</th>' +
+    '<th class="num">应收</th><th class="num">实收</th><th>收款</th><th class="num">未收</th>' +
+    '</tr></thead><tbody>';
+  pageGroups.forEach(g => {
+    let fee = 0, ot = 0, fsum = 0, gsum = 0;
+    g.items.forEach(x => {
+      fee += +x.r.tableFee || 0; ot += +x.r.other || 0;
+      fsum += +x.r.fee || 0; gsum += recCollected(x.r);
+    });
+    html += '<tr class="grp"><td colspan="11">📅 ' + esc(g.date) + ' 周' + weekdayCn(g.date) +
+      ' · ' + g.items.length + ' 笔　台费 ' + money(round2(fee)) + '　其它 ' + money(round2(ot)) +
+      '　手续费 ' + money(round2(fsum)) + '　实收 ' + money(round2(gsum)) + '</td></tr>';
+    g.items.forEach(x => {
+      const r = x.r;
+      const pay = r.payType === "rmb" ? "¥" + (+r.rmbActual || 0).toFixed(2)
+                : r.payType === "mixed" ? "混合"
+                : r.payType === "card" ? "刷卡" : "现金";
+      const cls = r.payType === "rmb" ? "rmb" : r.payType === "mixed" ? "mixed" : r.payType === "card" ? "card" : "cash";
+      html += '<tr data-rid="' + esc(x.id) + '">' +
+        '<td>' + esc(r.date || "") + ' <span class="muted">' + esc((r.start || "") + (r.end ? "–" + r.end : "")) + '</span></td>' +
+        '<td>' + (r.kind === "retail" ? "配件" : pad2(r.seatNo || 0) + ' 号') + '</td>' +
+        '<td>' + esc(TYPE[r.type] || "—") + '</td>' +
+        '<td>' + (r.kind === "retail" ? "—" : (+r.hours || 0) + ' h') + '</td>' +
+        '<td class="num">' + money(r.tableFee || 0) + '</td>' +
+        '<td class="num">' + money(r.other || 0) + '</td>' +
+        '<td class="num">' + money(r.fee || 0) + '</td>' +
+        '<td class="num">' + money(recGrand(r)) + '</td>' +
+        '<td class="num"><b>' + money(recCollected(r)) + '</b></td>' +
+        '<td><span class="chip ' + cls + '">' + pay + '</span></td>' +
+        '<td class="num">' + ((+r.unpaid || 0) > 0.005 ? '<span style="color:#b45309;font-weight:700">' + money(r.unpaid) + '</span>' : "—") + '</td>' +
+        '</tr>';
+    });
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+  const pg = document.getElementById("histPager");
+  if (pg){
+    pg.innerHTML = pages.length > 1
+      ? '<button class="btn ghost sm" data-pg="-1"' + (histPage <= 0 ? " disabled" : "") + '>◀ 上一页</button>' +
+        '<span>第 ' + (histPage + 1) + ' / ' + pages.length + ' 页 · 共 ' + state.records.length + ' 笔</span>' +
+        '<button class="btn ghost sm" data-pg="1"' + (histPage >= pages.length - 1 ? " disabled" : "") + '>下一页 ▶</button>'
+      : '<span>共 ' + state.records.length + ' 笔</span>';
+  }
+}
+document.getElementById("histWrap").addEventListener("click", e => {
+  const tr = e.target.closest("tr[data-rid]");
+  if (!tr) return;
+  const idx = state.records.findIndex(x => x.id === tr.getAttribute("data-rid"));
+  if (idx < 0) return;
+  openRecordEdit(idx);
+});
+document.getElementById("histPager").addEventListener("click", e => {
+  const b = e.target.closest("[data-pg]"); if (!b) return;
+  histPage += parseInt(b.dataset.pg, 10) || 0;
+  renderHistory();
+});
+document.getElementById("histFilter").addEventListener("input", e => {
+  histFilter = e.target.value;
+  histPage = 0;
+  renderHistory();
+});
+
+/* ---------- 统计 ---------- */
+let statsScope = "day";
+function statsToday(){ return fmtDate(Date.now()); }
+function statsRange(){
+  const today = statsToday();
+  if (statsScope === "week"){
+    const wr = weekRangeOf(document.getElementById("stWeek").value || thisWeekVal()) || weekRangeOf(thisWeekVal());
+    return { from: wr.from, to: wr.to, scope: "week" };
+  }
+  if (statsScope === "month"){
+    const mv = document.getElementById("stMonth").value || today.slice(0, 7);
+    const mr = monthRangeOf(mv) || monthRangeOf(today.slice(0, 7));
+    return { from: mr.from, to: mr.to, scope: "month" };
+  }
+  let day = document.getElementById("stDate").value || today;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) day = today;
+  return { from: day, to: day, scope: "day" };
+}
+function statsRangeLabel(per){
+  if (per.scope === "week")
+    return per.from.slice(5).replace("-", "/") + "（周一）– " + per.to.slice(5).replace("-", "/") + "（周日）";
+  if (per.scope === "month")
+    return per.from.slice(0, 4) + " 年 " + Number(per.from.slice(5, 7)) + " 月";
+  return per.from.replace(/-/g, "/") + "（当天）";
+}
+function statsScopeWord(){
+  return statsScope === "week" ? "这周" : (statsScope === "month" ? "这个月" : "这天");
+}
+function statsCalc(per){
+  const r = { tableFee: 0, other: 0, fee: 0, tableGrand: 0, otherGrand: 0, grand: 0, collected: 0,
+              unpaid: 0, cash: 0, card: 0, rmb: 0, rmbActual: 0, count: 0, hours: 0, acc: 0, txns: [] };
+  const match = d => !!d && d >= per.from && d <= per.to;
+  state.records.forEach((h, i) => {
+    if (!match(h.date)) return;
+    const tf = +h.tableFee || 0;
+    const ot = +h.other || 0;
+    const hfee = +h.fee || 0;
+    // 拼豆的统计把「刷卡手续费」单独列一张卡，所以台费 / 其它都保持【纯金额】，
+    // 应收 = 台费 + 其它 + 手续费（= 记录里的 grand），三张卡加起来正好对上。
+    r.tableFee = round2(r.tableFee + tf);
+    r.other = round2(r.other + ot);
+    r.fee = round2(r.fee + hfee);
+    r.tableGrand = round2(r.tableGrand + tf);
+    r.otherGrand = round2(r.otherGrand + ot);
+    r.grand = round2(r.grand + recGrand(h));
+    r.collected = round2(r.collected + recCollected(h));
+    r.unpaid = round2(r.unpaid + (+h.unpaid || 0));
+    r.count++;
+    r.hours = round2(r.hours + (+h.hours || 0));
+    r.acc = round2(r.acc + (+h.accessories || 0));
+    if (h.parts && h.parts.length){
+      for (let pi = 0; pi < h.parts.length; pi++){
+        const pp = h.parts[pi], amt = +pp.due || 0;
+        if (pp.payType === "cash") r.cash = round2(r.cash + amt);
+        else if (pp.payType === "rmb"){ r.rmb = round2(r.rmb + amt); r.rmbActual = round2(r.rmbActual + (+pp.rmb || 0)); }
+        else r.card = round2(r.card + amt);
+      }
+    } else {
+      const due0 = recGrand(h);
+      if (h.payType === "cash") r.cash = round2(r.cash + due0);
+      else if (h.payType === "rmb"){ r.rmb = round2(r.rmb + due0); r.rmbActual = round2(r.rmbActual + (+h.rmbActual || 0)); }
+      else r.card = round2(r.card + due0);
+    }
+    const tTxt = (h.start && h.end) ? (h.start + "–" + h.end)
+               : (h.kind === "retail" ? String(h.time || "").replace(/^\d{4}-\d{2}-\d{2}\s*/, "") : (h.start || h.time || ""));
+    r.txns.push({ dt: h.date, t: tTxt, r: h, idx: i, a: recCollected(h) });
+  });
+  return r;
+}
+/* 预估营业额：已结 + 进行中 + 待结算（天胡 estimateBiz 的简化版） */
+function estimateBiz(){
+  let running = 0, waiting = 0, runCount = 0, waitCount = 0;
+  state.seats.forEach(s => {
+    if (s.status === "running" || s.status === "paused"){
+      running = round2(running + billFor(s, elapsed(s)).amount); runCount++;
+    } else if (s.status === "ended"){
+      waiting = round2(waiting + billFor(s, elapsed(s)).amount + (+s.carry || 0)); waitCount++;
+    }
+  });
+  return { running: running, waiting: waiting, runCount: runCount, waitCount: waitCount };
+}
+function statCard(k, v, sub, main){
+  return '<div class="card' + (main ? " main" : "") + '"><div class="cl">' + k + '</div><div class="cv">' + v + '</div>' +
+    (sub ? '<div class="cs">' + sub + "</div>" : "") + "</div>";
+}
+function renderStats(){
+  if (currentTab !== "stats") return;
+  const per = statsRange();
+  const r = statsCalc(per);
+  const label = statsRangeLabel(per);
+  const el = document.getElementById("stRange");
+  if (el) el.textContent = label;
+  const title = document.getElementById("stTxnTitle");
+  if (title) title.textContent = label + " · 明细";
+  const sumEl = document.getElementById("stTxnSum");
+  if (sumEl) sumEl.textContent = r.count + " 笔 · 实收 " + money(r.collected) + (r.unpaid > 0.005 ? " · 未收 " + money(r.unpaid) : "");
+
+  const biz = round2(r.tableGrand + r.otherGrand);
+  document.getElementById("stCards").innerHTML =
+    statCard("营业总额（应收）", money(r.grand),
+      "实收 " + money(r.collected) + "　未收 " + money(r.unpaid) + "　·　" + r.count + " 单", true) +
+    statCard("台费", money(r.tableGrand), r.count + " 单 · " + r.hours + " 小时") +
+    statCard("其它费用", money(r.otherGrand), "随单收的额外项" + (r.acc > 0.005 ? " · 其中配件 " + money(r.acc) : "")) +
+    statCard("刷卡手续费", money(r.fee), "台费 + 其它 + 手续费 = 应收") +
+    statCard("其中人民币", "¥" + r.rmbActual.toFixed(2), "折合 " + money(r.rmb) + " 澳币") +
+    statCard("平均客单", money(r.count ? r.collected / r.count : 0), "实收 ÷ 单数") +
+    statCard("计时总长", r.hours + " h", r.count ? "平均 " + (Math.round(r.hours / r.count * 100) / 100) + " 小时/单" : "—");
+
+  const est = estimateBiz();
+  const estBox = document.getElementById("stEstimate");
+  if (estBox){
+    const isToday = per.scope === "day" && per.from === statsToday();
+    if (isToday || est.runCount || est.waitCount){
+      estBox.innerHTML = '<div class="est-band"><div><div class="k">预估营业额（含未结）</div>' +
+        '<div class="v">' + money(round2(biz + est.running + est.waiting)) + '</div></div>' +
+        '<div class="parts"><span>已结 <b>' + money(biz) + '</b></span><span>＋ 进行中 <b>' + money(est.running) + '</b></span>' +
+        '<span>＋ 待结算 <b>' + money(est.waiting) + '</b></span>' +
+        '<span class="muted">' + (est.runCount ? est.runCount + " 个工位在计时" : "没有工位在计时") +
+        (est.waitCount ? "　·　" + est.waitCount + " 单待结算" : "") + '　·　未结部分未含手续费</span></div></div>';
+    } else estBox.innerHTML = "";
+  }
+
+  const wrap = document.getElementById("stTxnWrap");
+  if (!r.txns.length){ wrap.innerHTML = '<div class="empty">' + statsScopeWord() + "没有记录</div>"; return; }
+  const list = r.txns.slice().sort((a, b) => {
+    if (a.dt !== b.dt) return a.dt < b.dt ? 1 : -1;
+    return (+b.r.endTs || 0) - (+a.r.endTs || 0);
+  });
+  const groups = [];
+  let cur = null;
+  list.forEach(x => {
+    if (!cur || cur.date !== x.dt){ cur = { date: x.dt, items: [] }; groups.push(cur); }
+    cur.items.push(x);
+  });
+  let html = '<table class="rt"><thead><tr><th>日期 · 时间</th><th>工位</th><th>板型</th><th>时长</th>' +
+    '<th class="num">台费</th><th class="num">其它</th><th class="num">手续费</th><th class="num">实收</th><th>收款</th></tr></thead><tbody>';
+  groups.forEach(g => {
+    let gs = 0;
+    g.items.forEach(x => { gs += recCollected(x.r); });
+    html += '<tr class="grp"><td colspan="9">📅 ' + esc(g.date) + ' 周' + weekdayCn(g.date) +
+      ' · ' + g.items.length + ' 笔　实收 ' + money(round2(gs)) + '</td></tr>';
+    g.items.forEach(x => {
+      const h = x.r;
+      const pay = h.payType === "rmb" ? "¥" + (+h.rmbActual || 0).toFixed(2)
+                : h.payType === "mixed" ? "混合" : h.payType === "card" ? "刷卡" : "现金";
+      const cls = h.payType === "rmb" ? "rmb" : h.payType === "mixed" ? "mixed" : h.payType === "card" ? "card" : "cash";
+      html += '<tr data-rid="' + esc(h.id) + '">' +
+        '<td>' + esc(h.date || "") + ' <span class="muted">' + esc(x.t) + '</span></td>' +
+        '<td>' + pad2(h.seatNo || 0) + ' 号</td>' +
+        '<td>' + esc(TYPE[h.type] || "—") + '</td>' +
+        '<td>' + (+h.hours || 0) + ' h</td>' +
+        '<td class="num">' + money(h.tableFee || 0) + '</td>' +
+        '<td class="num">' + money(h.other || 0) + '</td>' +
+        '<td class="num">' + money(h.fee || 0) + '</td>' +
+        '<td class="num"><b>' + money(recCollected(h)) + '</b></td>' +
+        '<td><span class="chip ' + cls + '">' + pay + '</span></td></tr>';
+    });
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+document.getElementById("stTxnWrap").addEventListener("click", e => {
+  const tr = e.target.closest("tr[data-rid]"); if (!tr) return;
+  const idx = state.records.findIndex(x => x.id === tr.getAttribute("data-rid"));
+  if (idx >= 0) openRecordEdit(idx);
+});
+
+/* 统计范围控件（天胡 app.js:3800 那套 ◀ ▶ 的简化版） */
+function setStatsScope(s){
+  statsScope = s;
+  document.getElementById("stDate").style.display = s === "day" ? "" : "none";
+  document.getElementById("stWeek").style.display = s === "week" ? "" : "none";
+  document.getElementById("stMonth").style.display = s === "month" ? "" : "none";
+  document.getElementById("stByDay").className = "btn sm" + (s === "day" ? " primary" : "");
+  document.getElementById("stByWeek").className = "btn sm" + (s === "week" ? " primary" : "");
+  document.getElementById("stByMonth").className = "btn sm" + (s === "month" ? " primary" : "");
+  renderStats();
+}
+document.getElementById("stByDay").addEventListener("click", () => setStatsScope("day"));
+document.getElementById("stByWeek").addEventListener("click", () => setStatsScope("week"));
+document.getElementById("stByMonth").addEventListener("click", () => setStatsScope("month"));
+document.getElementById("stDate").addEventListener("change", renderStats);
+document.getElementById("stWeek").addEventListener("change", renderStats);
+document.getElementById("stMonth").addEventListener("change", renderStats);
+document.getElementById("stToday").addEventListener("click", () => {
+  const t = statsToday();
+  document.getElementById("stDate").value = t;
+  document.getElementById("stWeek").value = thisWeekVal();
+  document.getElementById("stMonth").value = t.slice(0, 7);
+  renderStats();
+});
+document.getElementById("stPrev").addEventListener("click", () => shiftStats(-1));
+document.getElementById("stNext").addEventListener("click", () => shiftStats(1));
+function shiftStats(dir){
+  if (statsScope === "week"){
+    const v = document.getElementById("stWeek").value || thisWeekVal();
+    const wr = weekRangeOf(v); if (!wr) return;
+    const d = wr.mon; d.setDate(d.getDate() + dir * 7);
+    document.getElementById("stWeek").value = thisWeekValOf(d);
+  } else if (statsScope === "month"){
+    const v = document.getElementById("stMonth").value || statsToday().slice(0, 7);
+    const y = +v.slice(0, 4), m = +v.slice(5, 7);
+    const d = new Date(y, m - 1 + dir, 1);
+    document.getElementById("stMonth").value = d.getFullYear() + "-" + pad2(d.getMonth() + 1);
+  } else {
+    const v = document.getElementById("stDate").value || statsToday();
+    const d = new Date(v + "T12:00:00");
+    d.setDate(d.getDate() + dir);
+    document.getElementById("stDate").value = fmtDate(d.getTime());
+  }
+  renderStats();
+}
+function thisWeekValOf(dateObj){
+  const t = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+  t.setDate(t.getDate() + 3 - ((t.getDay() + 6) % 7));
+  const wk1 = new Date(t.getFullYear(), 0, 4);
+  const n = 1 + Math.round(((t - wk1) / 86400000 - 3 + ((wk1.getDay() + 6) % 7)) / 7);
+  return t.getFullYear() + "-W" + pad2(n);
+}
+/* 一键生成文案（天胡 statsCopyText 的简化版） */
+document.getElementById("stCopyBtn").addEventListener("click", () => {
+  const per = statsRange();
+  const r = statsCalc(per);
+  const fmt = n => money(round2(n));
+  const lines = [];
+  lines.push("📊 拼豆店 · " + statsRangeLabel(per));
+  lines.push("单数 " + r.count + " 单 · 应收 " + fmt(r.grand) + " · 实收 " + fmt(r.collected) +
+             (r.unpaid > 0.005 ? " · 未收 " + fmt(r.unpaid) : ""));
+  lines.push("台费 " + fmt(r.tableGrand) + " · 其它 " + fmt(r.otherGrand) +
+             (r.acc > 0.005 ? "（含配件 " + fmt(r.acc) + "）" : "") + " · 刷卡手续费 " + fmt(r.fee));
+  lines.push("现金 " + fmt(r.cash) + " · 刷卡 " + fmt(r.card) + " · 人民币 " + fmt(r.rmb) +
+             (r.rmbActual > 0.005 ? "（实收 ¥" + r.rmbActual.toFixed(2) + "）" : ""));
+  lines.push("计时 " + r.hours + " 小时 · 平均客单 " + fmt(r.count ? r.collected / r.count : 0));
+  const text = lines.join("\n");
+  openModal("统计文案", () => {
+    $("#mBody").innerHTML = '<textarea id="copyArea" readonly style="width:100%;min-height:150px;padding:10px 12px;' +
+      'border:1px solid var(--line);border-radius:10px;font-size:12.5px;line-height:1.8;font-family:inherit;' +
+      'background:#fbf8f2;color:var(--ink);resize:vertical">' + esc(text) + '</textarea>';
+    $("#mFoot").innerHTML = '<button class="btn" data-act="cancel">关闭</button><button class="btn acc" data-act="copy">📋 复制</button>';
+  }, e => {
+    const a = e.target.closest("[data-act]"); if (!a) return;
+    if (a.dataset.act === "cancel"){ closeModal(); return; }
+    if (a.dataset.act === "copy"){
+      const ta = document.getElementById("copyArea");
+      ta.select(); ta.setSelectionRange(0, ta.value.length);
+      try { navigator.clipboard.writeText(ta.value).then(() => toast("已复制"), () => document.execCommand("copy")); }
+      catch (err){ try { document.execCommand("copy"); } catch (e2){} }
+      toast("已复制到剪贴板");
+    }
+  });
+});
+
+/* ---------- 员工 / 打卡 / 工资 ---------- */
+const EMP_COLORS = ["#2c7a6b", "#3a6ea8", "#7a5aa8", "#b9861f", "#bd4a38", "#4f7a3a"];
+function empColor(i){ return EMP_COLORS[i % EMP_COLORS.length]; }
+function empByName(name){
+  for (let i = 0; i < state.employees.length; i++) if (state.employees[i].name === name) return state.employees[i];
+  return null;
+}
+function attOpen(name){
+  for (let i = state.attendance.length - 1; i >= 0; i--){
+    const r = state.attendance[i];
+    if (r.name === name && !r.clockOut) return r;
+  }
+  return null;
+}
+/* 天胡 app.js:13137 */
+function attHours(clockIn, clockOut){
+  const a = parseTimeStr(clockIn), b = parseTimeStr(clockOut);
+  if (!a || !b) return "";
+  let mins = (b.h * 60 + b.min) - (a.h * 60 + a.min);
+  if (mins < 0) mins += 1440;
+  return Math.round(mins / 60 * 100) / 100;
+}
+/* 天胡 app.js:15019 —— 白班/晚班拆分（晚班分界点 nightAt，营业日起算前的时段算前一天的晚班） */
+function splitShift(clockIn, clockOut, nightAtStr, override){
+  const a = parseTimeStr(clockIn), b = parseTimeStr(clockOut), na = parseTimeStr(nightAtStr);
+  if (!a || !b || !na) return null;
+  let start = a.h * 60 + a.min;
+  let end = b.h * 60 + b.min;
+  // 天胡是 end <= start 就 +24h；拼豆的打卡是 HH:MM 精度，上班立刻下班会落在同一分钟，
+  // 用 <= 会被算成 24 小时（工资直接多一天）→ 改成严格小于，同分钟 = 0 小时。
+  if (end < start) end += 1440;
+  const total = end - start;
+  if (override === "day") return { day: total, night: 0 };
+  if (override === "night") return { day: 0, night: total };
+  const ws = na.h * 60 + na.min;
+  const dayStart = 6 * 60;                       // 拼豆没设营业日起算，固定 06:00（和天胡默认一致）
+  let dayLen = ((ws - dayStart) + 1440) % 1440;
+  if (dayLen === 0) dayLen = 1440;
+  let dayMin = 0, nightMin = 0;
+  for (let m = start; m < end; m++){
+    let p = (((m % 1440) + 1440) % 1440) - dayStart;
+    if (p < 0) p += 1440;
+    if (p < dayLen) dayMin++; else nightMin++;
+  }
+  return { day: dayMin, night: nightMin };
+}
+/* 天胡 app.js:15090 dayBizOf —— 营业额口径：台费 + 其它（不含刷卡手续费） */
+function dayBizOf(date){
+  let t = 0;
+  state.records.forEach(h => {
+    if (h.date !== date) return;
+    t += round2((+h.tableFee || 0) + (+h.other || 0));
+  });
+  return round2(t);
+}
+/* 天胡 app.js:15110 busyOf */
+function busyOf(att){
+  const thr = Number(state.settings.busyThreshold) || 400;
+  const biz = dayBizOf(att.date || "");
+  const auto = biz > thr;
+  const on = att.busy === "yes" ? true : (att.busy === "no" ? false : auto);
+  return { biz: biz, auto: auto, on: on, bonus: on ? (Number(state.settings.busyBonus) || 0) : 0 };
+}
+let wageMode = "month";
+function wagePeriod(){
+  if (wageMode === "week"){
+    const wr = weekRangeOf(document.getElementById("wageWeek").value || thisWeekVal());
+    if (!wr) return null;
+    return { from: wr.from, to: wr.to, label: wr.from.slice(5).replace("-", "/") + " ~ " + wr.to.slice(5).replace("-", "/") + "（周一–周日）" };
+  }
+  const mth = document.getElementById("wageMonth").value || statsToday().slice(0, 7);
+  const mr = monthRangeOf(mth);
+  if (!mr) return null;
+  return { from: mr.from, to: mr.to, label: mth.slice(0, 4) + " 年 " + Number(mth.slice(5, 7)) + " 月" };
+}
+/* 天胡 app.js:15188 wageCalc */
+function wageCalc(from, to){
+  const rows = [];
+  let tDay = 0, tNight = 0, tBusy = 0, tPay = 0;
+  const dr = Number(state.settings.dayRate) || 0;
+  const nr = Number(state.settings.nightRate) || 0;
+  const nightAt = state.settings.nightAt || "21:00";
+  state.employees.forEach(e => {
+    let dm = 0, nm = 0, bm = 0;
+    state.attendance.forEach(a => {
+      if (a.name !== e.name) return;
+      const ad = a.date || "";
+      if (!ad || ad < from || ad > to) return;
+      if (!a.clockIn) return;
+      let co = a.clockOut;
+      if (!co){
+        // 还没下班的班次也算（算到此刻）；以前忘下班的不猜
+        if (ad === statsToday()) co = fmtHM(Date.now());
+        else return;
+      }
+      const sp = splitShift(a.clockIn, co, nightAt, a.shift || "");
+      if (!sp) return;
+      dm += sp.day; nm += sp.night;
+      const bo = busyOf(a);
+      bm += (sp.day + sp.night) / 60 * bo.bonus;
+    });
+    const dh = Math.round(dm / 60 * 100) / 100;
+    const nh = Math.round(nm / 60 * 100) / 100;
+    const busyPay = round2(bm);
+    const pay = round2(dh * dr + nh * nr + busyPay);
+    rows.push({ name: e.name, dayH: dh, nightH: nh, dayPay: round2(dh * dr),
+                nightPay: round2(nh * nr), busyPay: busyPay, pay: pay });
+    tDay += dh; tNight += nh; tBusy += busyPay; tPay += pay;
+  });
+  return { rows: rows, dayH: Math.round(tDay * 100) / 100, nightH: Math.round(tNight * 100) / 100,
+           busyPay: round2(tBusy), pay: round2(tPay) };
+}
+
+const empTimeDraft = {};      // 员工卡上手动填的上班时间（重渲染不丢）
+function renderEmpList(){
+  const wrap = document.getElementById("empList");
+  if (!wrap) return;
+  if (!state.employees.length){
+    wrap.innerHTML = '<div class="empty" style="grid-column:1/-1">还没有员工。上面输入姓名点「+ 添加员工」。</div>';
+    return;
+  }
+  wrap.innerHTML = state.employees.map((e, i) => {
+    const open = attOpen(e.name);
+    const draft = empTimeDraft[e.name] || "";
+    return '<div class="emp' + (open ? " on" : "") + '">' +
+      '<div class="top">' +
+        '<span class="av" style="background:' + empColor(i) + '">' + esc(String(e.name || "?").slice(0, 1)) + '</span>' +
+        '<div class="who">' +
+          '<div class="nm">' + esc(e.name) + '</div>' +
+          '<div class="st' + (open ? " on" : "") + '"><i></i>' + (open ? "在班 " + esc(open.clockIn) + " 起" : "未上班") + '</div>' +
+        '</div>' +
+        '<button class="pencil" data-emprename="' + esc(e.id) + '" title="改名">✎</button>' +
+      '</div>' +
+      (open
+        ? '<div class="tline"><span class="tlabel">开始时间</span><span class="tval">' + esc(open.clockIn) + '</span></div>' +
+          '<button class="act out" data-attout="' + esc(e.name) + '">下班打卡</button>'
+        : '<div class="tline"><span class="tlabel">开始时间</span>' +
+            '<input class="tinput" data-emptime="' + esc(e.name) + '" maxlength="5" inputmode="numeric" ' +
+            'placeholder="现在" title="留空 = 按现在开始上班" value="' + esc(draft) + '"></div>' +
+          '<button class="act in" data-attin="' + esc(e.name) + '">上班打卡</button>') +
+      '<button class="del" data-empdel="' + esc(e.id) + '">删除员工</button>' +
+      '</div>';
+  }).join("");
+}
+function renderAtt(){
+  const wrap = document.getElementById("attWrap");
+  if (!wrap) return;
+  const cnt = document.getElementById("attCount");
+  if (cnt) cnt.textContent = state.attendance.length + " 条";
+  if (!state.attendance.length){
+    wrap.innerHTML = '<div class="empty">还没有打卡记录。</div>';
+    return;
+  }
+  const rows = state.attendance.slice().sort((a, b) => {
+    const ad = a.date || "", bd = b.date || "";
+    if (ad !== bd) return ad < bd ? 1 : -1;
+    return String(b.clockIn || "").localeCompare(String(a.clockIn || ""));
+  });
+  let html = '<table class="rt"><thead><tr><th>日期</th><th>员工</th><th>上班</th><th>下班</th><th class="num">时数</th>' +
+    '<th>班次</th><th>忙日</th><th></th></tr></thead><tbody>';
+  rows.forEach(a => {
+    const bo = busyOf(a);
+    const h = a.clockOut ? attHours(a.clockIn, a.clockOut) : "";
+    html += '<tr>' +
+      '<td>' + esc(a.date || "") + '</td>' +
+      '<td>' + esc(a.name || "") + '</td>' +
+      '<td>' + esc(a.clockIn || "") + '</td>' +
+      '<td>' + (a.clockOut ? esc(a.clockOut) : '<span style="color:#b45309;font-weight:700">在班</span>') + '</td>' +
+      '<td class="num">' + (h === "" ? "—" : h) + '</td>' +
+      '<td><select class="mini-sel" data-attshift="' + esc(a.id) + '">' +
+        '<option value=""' + (!a.shift ? " selected" : "") + '>自动</option>' +
+        '<option value="day"' + (a.shift === "day" ? " selected" : "") + '>白班</option>' +
+        '<option value="night"' + (a.shift === "night" ? " selected" : "") + '>晚班</option></select></td>' +
+      '<td>' + (bo.on ? '<span class="chip cash">忙 +' + money(bo.bonus) + '/h</span>' : '<span class="muted">—</span>') +
+        ' <span class="muted" style="font-size:10px">营业额 ' + money(bo.biz) + '</span></td>' +
+      '<td><button class="btn ghost sm" data-attedit="' + esc(a.id) + '">改</button>' +
+        '<button class="btn ghost sm" data-attdel="' + esc(a.id) + '">删</button></td>' +
+      '</tr>';
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+function renderWages(){
+  const box = document.getElementById("wageList");
+  if (!box) return;
+  const per = wagePeriod();
+  if (!per){ box.innerHTML = '<div class="empty">选择周期</div>'; return; }
+  const w = wageCalc(per.from, per.to);
+  const rangeEl = document.getElementById("wageRange");
+  if (rangeEl) rangeEl.textContent = per.label;
+  if (!w.rows.length){ box.innerHTML = '<div class="empty">还没有员工</div>'; return; }
+  let html = '<table class="rt" style="margin-top:10px"><thead><tr><th>员工</th>' +
+    '<th class="num">白班时数</th><th class="num">晚班时数</th><th class="num">忙日加成</th><th class="num">合计</th></tr></thead><tbody>';
+  w.rows.forEach(r => {
+    html += '<tr><td><b>' + esc(r.name) + '</b></td>' +
+      '<td class="num">' + r.dayH + ' h <span class="muted">' + money(r.dayPay) + '</span></td>' +
+      '<td class="num">' + r.nightH + ' h <span class="muted">' + money(r.nightPay) + '</span></td>' +
+      '<td class="num">' + money(r.busyPay) + '</td>' +
+      '<td class="num"><b>' + money(r.pay) + '</b></td></tr>';
+  });
+  html += '<tr class="grp"><td>合计</td><td class="num">' + w.dayH + ' h</td><td class="num">' + w.nightH + ' h</td>' +
+    '<td class="num">' + money(w.busyPay) + '</td><td class="num">' + money(w.pay) + '</td></tr>';
+  html += '</tbody></table>';
+  box.innerHTML = html;
+}
+function syncWageInputs(){
+  const s = state.settings;
+  const set = (id, v) => { const el = document.getElementById(id); if (el && document.activeElement !== el) el.value = v; };
+  set("dayRate", s.dayRate);
+  set("nightRate", s.nightRate);
+  set("nightAt", s.nightAt);
+  set("busyThreshold", s.busyThreshold);
+  set("busyBonus", s.busyBonus);
+}
+function renderStaff(){
+  if (currentTab !== "staff") return;
+  renderEmpList();
+  renderAtt();
+  syncWageInputs();
+  const ws = document.getElementById("wageSection");
+  if (ws && ws.style.display !== "none") renderWages();
+}
+
+document.getElementById("empAdd").addEventListener("click", () => {
+  const el = document.getElementById("empName");
+  const name = String(el.value || "").trim();
+  if (!name){ toast("先填姓名"); return; }
+  if (empByName(name)){ toast("已经有这个员工了"); return; }
+  state.employees.push({ id: nextId(), name: name, color: empColor(state.employees.length) });
+  el.value = "";
+  touch(); renderStaff();
+  toast("已添加员工：" + name);
+});
+document.getElementById("empName").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("empAdd").click(); });
+document.getElementById("empList").addEventListener("click", e => {
+  const ren = e.target.closest("[data-emprename]");
+  if (ren){ openEmpRename(ren.getAttribute("data-emprename")); return; }
+  const del = e.target.closest("[data-empdel]");
+  if (del){
+    const id = del.getAttribute("data-empdel");
+    const emp = state.employees.find(x => x.id === id);
+    if (!emp) return;
+    if (!armIsOn(del)){                    // 两下确认，防手滑；点到别处自动作废
+      armOn(del, "再点一次确认删除");
+      return;
+    }
+    armOff(del);
+    state.employees = state.employees.filter(x => x.id !== id);
+    touch(); renderStaff();
+    toast("已删除员工：" + emp.name + "（打卡记录保留）");
+    return;
+  }
+  const inBtn = e.target.closest("[data-attin]");
+  if (inBtn){
+    const card = inBtn.closest(".emp");
+    const inp = card ? card.querySelector(".tinput") : null;
+    doClockIn(inBtn.getAttribute("data-attin"), inp ? inp.value : "");
+    return;
+  }
+  const outBtn = e.target.closest("[data-attout]");
+  if (outBtn){
+    const name = outBtn.getAttribute("data-attout");
+    const open = attOpen(name);
+    if (!open){ toast("没有在班的记录"); return; }
+    open.clockOut = fmtHM(Date.now());
+    open.hours = attHours(open.clockIn, open.clockOut);
+    touch(); renderStaff();
+    toast(name + " 下班打卡 " + open.clockOut + " · " + open.hours + " 小时");
+  }
+});
+/* 员工改名（打卡是按姓名关联的，改名要一起改历史，否则工资算不到） */
+function openEmpRename(id){
+  const emp = state.employees.find(x => x.id === id);
+  if (!emp) return;
+  const oldName = emp.name;
+  openModal("员工改名", () => {
+    $("#mBody").innerHTML =
+      '<div class="field"><label>姓名</label><input class="input" id="empNewName" value="' + esc(oldName) + '"></div>' +
+      '<div class="xsmall muted">改名会同时改掉这个人已有的打卡记录（打卡按姓名关联）。</div>';
+    $("#mFoot").innerHTML = '<button class="btn" data-act="cancel">取消</button><button class="btn acc" data-act="save">保存</button>';
+  }, e => {
+    const a = e.target.closest("[data-act]"); if (!a) return;
+    if (a.dataset.act === "cancel"){ closeModal(); return; }
+    if (a.dataset.act === "save"){
+      const name = String(document.getElementById("empNewName").value || "").trim();
+      if (!name){ toast("姓名不能为空"); return; }
+      if (name !== oldName && empByName(name)){ toast("已经有这个员工了"); return; }
+      emp.name = name;
+      state.attendance.forEach(x => { if (x.name === oldName) x.name = name; });
+      if (empTimeDraft[oldName] != null){ empTimeDraft[name] = empTimeDraft[oldName]; delete empTimeDraft[oldName]; }
+      touch(); closeModal(); renderStaff();
+      toast("已改名：" + oldName + " → " + name);
     }
   });
 }
+
+/* 上班打卡：卡片上填了时间就按填的，没填就按现在（不再弹窗） */
+function doClockIn(name, rawTime){
+  const open = attOpen(name);
+  if (open){
+    toast(name + " 已经在班上了（" + open.clockIn + " 起）");
+    return;
+  }
+  const raw = String(rawTime == null ? "" : rawTime).trim();
+  let clockIn;
+  if (!raw){
+    clockIn = fmtHM(Date.now());
+  } else {
+    const t = parseTimeStr(raw);
+    if (!t){ toast("上班时间要写成 HH:MM（留空 = 现在）"); return; }
+    clockIn = pad2(t.h) + ":" + pad2(t.min);
+  }
+  const now = Date.now();
+  // 天胡的做法：谁上班就先把别人的班下掉（门店一次只有一个人在岗）
+  state.attendance.forEach(x => {
+    if (!x.clockOut && x.name !== name){
+      x.clockOut = fmtHM(now);
+      x.hours = attHours(x.clockIn, x.clockOut);
+    }
+  });
+  state.attendance.push({ id: nextId(), name: name, date: fmtDate(now), clockIn: clockIn,
+                          clockOut: "", hours: "", shift: "" });
+  delete empTimeDraft[name];
+  touch(); renderStaff();
+  toast(name + " 上班打卡 " + clockIn + (raw ? "" : "（现在）"));
+}
+
+document.getElementById("attWrap").addEventListener("click", e => {
+  const ed = e.target.closest("[data-attedit]");
+  if (ed){ openAttModal(ed.getAttribute("data-attedit")); return; }
+  const dl = e.target.closest("[data-attdel]");
+  if (dl){
+    const id = dl.getAttribute("data-attdel");
+    const rec = state.attendance.find(x => x.id === id);
+    if (!rec) return;
+    if (!armIsOn(dl)){ armOn(dl, "再点确认"); return; }
+    armOff(dl);
+    state.attendance = state.attendance.filter(x => x.id !== id);
+    touch(); renderStaff();
+    toast("已删除打卡记录");
+  }
+});
+document.getElementById("attWrap").addEventListener("change", e => {
+  const el = e.target.closest("[data-attshift]");
+  if (!el) return;
+  const id = el.getAttribute("data-attshift");
+  const rec = state.attendance.find(x => x.id === id);
+  if (!rec) return;
+  rec.shift = el.value;
+  touch(); renderStaff();
+});
+/* 手动补录 / 修改打卡（天胡 openAttModal） */
+function openAttModal(id){
+  const rec = id ? state.attendance.find(x => x.id === id) : null;
+  const names = state.employees.map(e => e.name);
+  if (!names.length){ toast("先添加员工"); return; }
+  const d = rec ? rec.date : fmtDate(Date.now());
+  const ci = rec ? rec.clockIn : "09:00";
+  const co = rec ? rec.clockOut : "";
+  openModal(id ? "修改打卡" : "手动补录打卡", () => {
+    $("#mBody").innerHTML =
+      '<div class="field"><label>员工</label><select class="input" id="attName">' +
+        names.map(n => '<option' + ((rec && rec.name === n) ? " selected" : "") + '>' + esc(n) + '</option>').join("") +
+      '</select></div>' +
+      '<div class="field"><label>日期</label><input class="input" type="date" id="attDate" value="' + esc(d) + '"></div>' +
+      '<div class="field"><label>上班时间（HH:MM）</label><input class="input" id="attIn" maxlength="5" value="' + esc(ci) + '"></div>' +
+      '<div class="field"><label>下班时间（留空 = 还在班）</label><input class="input" id="attOut" maxlength="5" value="' + esc(co) + '"></div>' +
+      '<div class="xsmall muted">跨零点没问题：结束时间早于开始时间按次日算。</div>';
+    $("#mFoot").innerHTML = '<button class="btn" data-act="cancel">取消</button><button class="btn acc" data-act="save">保存</button>';
+  }, e => {
+    const a = e.target.closest("[data-act]"); if (!a) return;
+    if (a.dataset.act === "cancel"){ closeModal(); return; }
+    if (a.dataset.act === "save"){
+      const name = document.getElementById("attName").value;
+      const date = document.getElementById("attDate").value;
+      const clockIn = document.getElementById("attIn").value.trim();
+      const clockOut = document.getElementById("attOut").value.trim();
+      if (!parseTimeStr(clockIn)){ toast("上班时间格式要 HH:MM"); return; }
+      if (clockOut && !parseTimeStr(clockOut)){ toast("下班时间格式要 HH:MM"); return; }
+      if (rec){
+        Object.assign(rec, { name: name, date: date, clockIn: clockIn, clockOut: clockOut,
+                             hours: clockOut ? attHours(clockIn, clockOut) : "" });
+      } else {
+        state.attendance.push({ id: nextId(), name: name, date: date, clockIn: clockIn,
+                                clockOut: clockOut, hours: clockOut ? attHours(clockIn, clockOut) : "", shift: "" });
+      }
+      touch(); closeModal(); renderStaff();
+      toast("已保存打卡");
+    }
+  });
+}
+document.getElementById("attAdd").addEventListener("click", () => openAttModal(null));
+
+/* 工资汇总面板（天胡 wageToggle） */
+document.getElementById("wageToggle").addEventListener("click", () => {
+  const ws = document.getElementById("wageSection");
+  ws.style.display = ws.style.display === "none" ? "" : "none";
+  if (ws.style.display !== "none"){
+    const t = statsToday();
+    if (!document.getElementById("wageMonth").value) document.getElementById("wageMonth").value = t.slice(0, 7);
+    if (!document.getElementById("wageWeek").value) document.getElementById("wageWeek").value = thisWeekVal();
+    renderWages();
+  }
+});
+document.getElementById("wageClose").addEventListener("click", () => { document.getElementById("wageSection").style.display = "none"; });
+document.getElementById("wageByMonth").addEventListener("click", () => {
+  wageMode = "month";
+  document.getElementById("wageMonth").style.display = "";
+  document.getElementById("wageWeek").style.display = "none";
+  document.getElementById("wageByMonth").className = "btn primary sm";
+  document.getElementById("wageByWeek").className = "btn sm";
+  renderWages();
+});
+document.getElementById("wageByWeek").addEventListener("click", () => {
+  wageMode = "week";
+  document.getElementById("wageMonth").style.display = "none";
+  document.getElementById("wageWeek").style.display = "";
+  document.getElementById("wageByWeek").className = "btn primary sm";
+  document.getElementById("wageByMonth").className = "btn sm";
+  renderWages();
+});
+document.getElementById("wageMonth").addEventListener("change", renderWages);
+document.getElementById("wageWeek").addEventListener("change", renderWages);
+document.getElementById("wagePeriodNow").addEventListener("click", () => {
+  const t = statsToday();
+  document.getElementById("wageMonth").value = t.slice(0, 7);
+  document.getElementById("wageWeek").value = thisWeekVal();
+  renderWages();
+});
+[["dayRate", "dayRate"], ["nightRate", "nightRate"], ["busyThreshold", "busyThreshold"], ["busyBonus", "busyBonus"]].forEach(([id, key]) => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener("change", () => {
+    state.settings[key] = Math.max(0, parseFloat(el.value) || 0);
+    touch(); renderWages();
+  });
+});
+document.getElementById("nightAt").addEventListener("change", e => {
+  state.settings.nightAt = parseTimeStr(e.target.value) ? e.target.value : "21:00";
+  touch(); renderWages();
+});
 
 /* 更新日志（数据由 生成更新日志.py 从 README 注入） */
 function clLine(s){
@@ -850,12 +3468,20 @@ setTimeout(checkVersion, 1800);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) checkVersion(); });
 
 /* 设置 / 刷新 / 价格摘要 */
-$("#cfgSum").addEventListener("click", openSettings);
+$("#cfgSum").addEventListener("click", openPriceSettings);
+$("#priceBtn").addEventListener("click", openPriceSettings);
+$("#paySetBtn").addEventListener("click", openPaySettings);
 $("#refreshBtn").addEventListener("click", () => location.replace(location.pathname + "?t=" + Date.now()));
-$("#settingsBtn").addEventListener("click", openSettings);
-function openSettings(){
+
+/* ============================================================
+   设置拆开放在对应的地方（原来一个弹窗塞 11 项，太杂）
+     · 板型与价格 → 工位页「⚙ 价格」/ 顶部价格摘要
+     · 收款与汇率 → 统计页「⚙ 收款设置」
+     · 工资相关   → 员工页「💰 工资汇总」里（本来就在那）
+   ============================================================ */
+function openPriceSettings(){
   const s = state.settings;
-  const build = () => {
+  openModal("板型与价格", () => {
     $("#mBody").innerHTML = `
       <div class="setgrid">
         <div class="field"><label>智能板 · 每小时 (A$)</label><input class="input" id="setSmartHourly" type="number" min="0" step="0.5" value="${s.smartHourly}"></div>
@@ -863,18 +3489,40 @@ function openSettings(){
         <div class="field"><label>智能板 · 2h 套餐 (A$)</label><input class="input" id="setSmartPackage" type="number" min="0" step="1" value="${s.smartPackage}"></div>
         <div class="field"><label>普通板 · 2h 套餐 (A$)</label><input class="input" id="setNormalPackage" type="number" min="0" step="1" value="${s.normalPackage}"></div>
         <div class="field"><label>套餐含多少分钟</label><input class="input" id="setPackageMinutes" type="number" min="30" step="15" value="${s.packageMinutes}"></div>
-        <div class="field"><label>刷卡手续费 %</label><input class="input" id="setCardFee" type="number" min="0" step="0.1" value="${s.cardFee}"></div>
         <div class="field"><label>智能板超时 / 15 分钟</label><input class="input" id="setSmartExtra" type="number" min="0" step="0.25" value="${s.smartExtra}"></div>
         <div class="field"><label>普通板超时 / 15 分钟</label><input class="input" id="setNormalExtra" type="number" min="0" step="0.25" value="${s.normalExtra}"></div>
+      </div>
+      <div class="xsmall muted" style="margin-top:10px">价格只影响新开的工单；进行中的按开台时锁定的价格结算。</div>`;
+    $("#mFoot").innerHTML = `<button class="btn" data-act="cancel">取消</button><button class="btn acc" data-act="save">保存</button>`;
+  }, e => {
+    const act = e.target.closest("[data-act]"); if (!act) return;
+    if (act.dataset.act === "cancel"){ closeModal(); return; }
+    if (act.dataset.act === "save"){
+      const val = id => Math.max(0, parseFloat($(id).value) || 0);
+      Object.assign(state.settings, {              // ★ 合并，不要整体替换（会丢工资等其它设置）
+        smartHourly: val("#setSmartHourly"), normalHourly: val("#setNormalHourly"),
+        smartPackage: val("#setSmartPackage"), normalPackage: val("#setNormalPackage"),
+        packageMinutes: Math.max(30, val("#setPackageMinutes")),
+        smartExtra: val("#setSmartExtra"), normalExtra: val("#setNormalExtra")
+      });
+      touch(); closeModal(); toast("价格已保存");
+    }
+  });
+}
+function openPaySettings(){
+  const s = state.settings;
+  openModal("收款与汇率", () => {
+    $("#mBody").innerHTML = `
+      <div class="setgrid">
+        <div class="field"><label>刷卡手续费 %</label><input class="input" id="setCardFee" type="number" min="0" step="0.1" value="${s.cardFee}"></div>
         <div class="field"><label>会员优惠 %</label><input class="input" id="setMemberDiscount" type="number" min="0" max="50" step="1" value="${s.memberDiscount}"></div>
         <div class="field"><label>人民币汇率 (1 AUD = ? CNY)</label><input class="input" id="setFxRate" type="number" min="0" step="0.0001" value="${s.fxRate}"></div>
         <div class="field"><label>汇率加点 %</label><input class="input" id="setFxMarkup" type="number" min="0" step="0.01" value="${s.fxMarkup}"></div>
       </div>
       <div class="fx-info" id="fxInfo">${fxInfoHTML()}</div>
-      <div class="xsmall muted" style="margin-top:10px">价格只影响新开的工单；进行中的按开台时锁定的价格结算。人民币金额 = 澳币应收 × 汇率。</div>`;
+      <div class="xsmall muted" style="margin-top:10px">人民币金额 = 澳币应收 × 汇率；刷卡手续费向上取整到分。</div>`;
     $("#mFoot").innerHTML = `<button class="btn" data-act="cancel">取消</button><button class="btn acc" data-act="save">保存</button>`;
-  };
-  openModal("设置 · 价格", build, e => {
+  }, e => {
     const act = e.target.closest("[data-act]"); if (!act) return;
     if (act.dataset.act === "cancel"){ closeModal(); return; }
     if (act.dataset.act === "fx-refresh"){
@@ -892,18 +3540,13 @@ function openSettings(){
       const val = id => Math.max(0, parseFloat($(id).value) || 0);
       const old = state.settings;
       const newFx = val("#setFxRate") || old.fxRate;
-      state.settings = {
-        smartHourly:val("#setSmartHourly"), normalHourly:val("#setNormalHourly"),
-        smartPackage:val("#setSmartPackage"), normalPackage:val("#setNormalPackage"),
-        packageMinutes:Math.max(30, val("#setPackageMinutes")),
-        cardFee:val("#setCardFee"),
-        smartExtra:val("#setSmartExtra"), normalExtra:val("#setNormalExtra"),
-        memberDiscount:Math.min(50, val("#setMemberDiscount")),
-        fxRate:newFx, fxMarkup:val("#setFxMarkup"),
-        fxMarket:old.fxMarket, fxUpdatedAt:newFx !== old.fxRate ? "手动" : old.fxUpdatedAt,
-        fxFetchedAt:old.fxFetchedAt
-      };
-      touch(); closeModal(); toast("设置已保存");
+      Object.assign(state.settings, {
+        cardFee: val("#setCardFee"),
+        memberDiscount: Math.min(50, val("#setMemberDiscount")),
+        fxRate: newFx, fxMarkup: val("#setFxMarkup"),
+        fxUpdatedAt: newFx !== old.fxRate ? "手动" : old.fxUpdatedAt
+      });
+      touch(); closeModal(); toast("收款设置已保存");
     }
   });
 }
@@ -952,6 +3595,594 @@ function initFB(){
   setInterval(pullNow, 3000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) pullNow(); });
 }
+
+/* ============================================================
+   配件（零售）
+   - 商品 / 分类全部由店主自己加，没有预设商品
+   - 两条出账：挂到工位（随台费一起结）/ 单独结算（零售单）
+   - 库存只在「变成一条记录」时扣：结算、零售、改单补差、删单归还
+   ============================================================ */
+function catOf(id){ return state.cats.find(c => c.id === id) || null; }
+function catName(id){ const c = catOf(id); return c ? c.name : "未分类"; }
+function catEmoji(id){ const c = catOf(id); return (c && c.emoji) || "🧩"; }
+function itemOf(id){ return state.items.find(x => x.id === id) || null; }
+
+/* 库存变动：只改数字 + 留一条记录 */
+function stockAdd(id, delta, why){
+  const it = itemOf(id);
+  delta = Math.round(+delta || 0);
+  if (!it || !delta) return;
+  const before = Math.max(0, Math.round(+it.stock || 0));
+  const after = Math.max(0, before + delta);
+  if (after === before) return;
+  it.stock = after;
+  state.stockLogs.unshift({id:nextId(), ts:Date.now(), itemId:id, name:it.name,
+    delta:after - before, before:before, after:after, why:why || "sale"});
+  if (state.stockLogs.length > 300) state.stockLogs.length = 300;
+}
+function applyItemsStock(items, sign, why){
+  (items || []).forEach(x => { if (x && x.id) stockAdd(x.id, sign * (+x.qty || 0), why); });
+}
+/* 改单：只按新旧差额补扣 / 归还 */
+function stockDiff(oldItems, newItems, why){
+  /* 库存变化 = 旧数量 - 新数量：删掉配件要归还，多加了要补扣 */
+  const m = new Map();
+  (oldItems || []).forEach(x => { if (x && x.id) m.set(x.id, (m.get(x.id) || 0) + (+x.qty || 0)); });
+  (newItems || []).forEach(x => { if (x && x.id) m.set(x.id, (m.get(x.id) || 0) - (+x.qty || 0)); });
+  m.forEach((d, id) => { if (d) stockAdd(id, d, why); });
+}
+
+/* ---------- 配件页渲染 ---------- */
+function retailList(){
+  const kw = String(retailQ || "").trim().toLowerCase();
+  return state.items.filter(it =>
+    (retailCat === "all" || it.cat === retailCat) &&
+    (!kw || (it.name + " " + catName(it.cat)).toLowerCase().indexOf(kw) >= 0)
+  ).sort((a, b) => (+a.sort || 0) - (+b.sort || 0));
+}
+function rdCartQty(id){ const c = retailCart.find(x => x.id === id); return c ? c.qty : 0; }
+function rdCartCount(){ return retailCart.reduce((a, x) => a + (+x.qty || 0), 0); }
+function rdCartSum(){ return round2(retailCart.reduce((a, x) => { const it = itemOf(x.id); return a + (it ? (+it.price || 0) * (+x.qty || 0) : 0); }, 0)); }
+
+function renderRetail(){
+  if (currentTab !== "retail") return;
+  renderRetailCats();
+  renderRetailGrid();
+  renderRetailCart();
+  renderRetailLow();
+  renderRetailAttach();
+  renderRetailRecords();
+}
+function renderRetailCats(){
+  const el = document.getElementById("rdCats");
+  if (!el) return;
+  const cats = state.cats.slice().sort((a, b) => (+a.sort || 0) - (+b.sort || 0));
+  let html = '<button class="rd-cat' + (retailCat === "all" ? " on" : "") + '" data-rcat="all">全部<span class="n">' + state.items.length + '</span></button>';
+  cats.forEach(c => {
+    const n = state.items.filter(x => x.cat === c.id).length;
+    html += '<button class="rd-cat' + (retailCat === c.id ? " on" : "") + '" data-rcat="' + esc(c.id) + '">' +
+      esc((c.emoji ? c.emoji + " " : "") + c.name) + '<span class="n">' + n + '</span></button>';
+  });
+  el.innerHTML = html;
+}
+function itemCardHtml(it){
+  const q = rdCartQty(it.id);
+  const stock = Math.max(0, Math.round(+it.stock || 0));
+  const sold = stock <= 0;
+  const low = !sold && stock <= Math.max(0, Math.round(+it.low || 0));
+  let corner = "";
+  if (rdEditMode){
+    corner = '<button class="pedit" data-redit="' + esc(it.id) + '" title="编辑这个商品">✎</button>';
+  } else if (sold){
+    corner = '<span class="sold-tag">售罄</span>';
+  } else if (q > 0){
+    corner = '<div class="stepper"><button data-rdec="' + esc(it.id) + '">−</button><b>' + q + '</b><button data-rinc="' + esc(it.id) + '">＋</button></div>';
+  } else {
+    corner = '<button class="padd" data-radd="' + esc(it.id) + '" title="加一件">＋</button>';
+  }
+  return '<div class="pcard' + (q > 0 && !rdEditMode ? " on" : "") + (sold ? " soldout" : "") + '" data-rid="' + esc(it.id) + '">' +
+    '<div class="pico">' + esc(catEmoji(it.cat)) + '</div>' +
+    '<div class="pname" title="' + esc(it.name) + '">' + esc(it.name) + '</div>' +
+    '<div class="pfoot"><b>' + money(it.price) + '</b><span class="pstock ' + (sold ? "out" : low ? "low" : "") + '">' +
+      (sold ? "售罄" : "库存 " + stock) + '</span></div>' + corner + '</div>';
+}
+function renderRetailGrid(){
+  const grid = document.getElementById("rdGrid"), emptyEl = document.getElementById("rdEmpty");
+  if (!grid || !emptyEl) return;
+  if (!state.items.length){ grid.innerHTML = ""; emptyEl.hidden = false; return; }
+  emptyEl.hidden = true;
+  const list = retailList();
+  grid.innerHTML = list.length ? list.map(itemCardHtml).join("") :
+    '<div class="empty" style="grid-column:1/-1;padding:30px">没有匹配的配件</div>';
+}
+function renderRetailCart(){
+  const el = document.getElementById("rdCart");
+  if (!el) return;
+  const rows = retailCart.map(c => {
+    const it = itemOf(c.id); if (!it) return "";
+    return '<div class="crow">' +
+      '<span class="cn">' + esc(it.name) + '<small>' + money(it.price) + ' × ' + c.qty + '</small></span>' +
+      '<span class="cq"><button data-rdec="' + esc(it.id) + '">−</button><b>' + c.qty + '</b><button data-rinc="' + esc(it.id) + '">＋</button></span>' +
+      '<button class="cx" data-rrm="' + esc(it.id) + '" title="删掉">✕</button></div>';
+  }).join("");
+  const empty = !retailCart.length;
+  let seatOpts = "";
+  for (let i = 1; i <= SEAT_COUNT; i++) seatOpts += '<option value="' + i + '"' + (rdSeatSel === i ? " selected" : "") + '>' + pad2(i) + ' 号工位</option>';
+  el.innerHTML = '<div class="ch"><b>🛒 本单配件</b><span class="cnt">' + rdCartCount() + ' 件</span></div>' +
+    '<div class="cb">' + (rows || '<div class="cempty">还没选东西<br><span class="xsmall">点左边配件加进来</span></div>') + '</div>' +
+    '<div class="cf">' +
+      '<div class="ctot"><span>合计</span><b>' + money(rdCartSum()) + '</b></div>' +
+      '<div class="hold"><select id="rdSeat">' + seatOpts + '</select>' +
+      '<button class="btn" id="rdAttach"' + (empty ? " disabled" : "") + '>挂到工位</button></div>' +
+      '<button class="btn acc" id="rdCheckout"' + (empty ? " disabled" : "") + '>🧾 单独结算</button>' +
+      '<div class="xsmall muted" style="text-align:center;line-height:1.5">挂到工位 = 随台费一起结<br>单独结算 = 只买配件、不开台</div>' +
+    '</div>';
+}
+function renderRetailLow(){
+  const el = document.getElementById("rdLow");
+  if (!el) return;
+  const low = state.items.filter(x => (+x.stock || 0) > 0 && (+x.stock || 0) <= (+x.low || 0));
+  const out = state.items.filter(x => (+x.stock || 0) <= 0);
+  if (!low.length && !out.length){ el.hidden = true; el.innerHTML = ""; return; }
+  el.hidden = false;
+  el.innerHTML = (low.length ? '⚠️ <b>低库存 ' + low.length + ' 项</b>：' + low.slice(0, 6).map(x => esc(x.name)).join("、") : "") +
+    (low.length && out.length ? "　·　" : "") +
+    (out.length ? '🔴 <b>售罄 ' + out.length + ' 项</b>：' + out.slice(0, 6).map(x => esc(x.name)).join("、") : "");
+}
+function renderRetailAttach(){
+  const el = document.getElementById("rdAttachBar");
+  if (!el) return;
+  const parts = [];
+  state.seats.forEach(s => { const sum = itemsSum(s.cart || []); if (sum > 0.005) parts.push(pad2(s.id) + " 号 " + money(sum)); });
+  if (!parts.length){ el.hidden = true; el.innerHTML = ""; return; }
+  el.hidden = false;
+  el.innerHTML = "🧩 <b>配件挂在工位上</b>：" + parts.join("　·　") + '<button data-rgo="board">去工位结算</button>';
+}
+function renderRetailRecords(){
+  const wrap = document.getElementById("rdRecords");
+  if (!wrap) return;
+  const rows = [];
+  state.records.forEach((r, i) => { if (r.items && r.items.length) rows.push({r:r, i:i}); });
+  const sumEl = document.getElementById("rdRecSum");
+  const total = round2(rows.reduce((a, x) => a + (+x.r.accessories || 0), 0));
+  if (sumEl) sumEl.textContent = rows.length ? rows.length + " 笔 · 配件合计 " + money(total) : "";
+  if (!rows.length){
+    wrap.innerHTML = '<div class="empty">还没有配件销售记录。单独结算、或在工位结算里带配件之后，会出现在这里。</div>';
+    const pg = document.getElementById("rdPager"); if (pg) pg.innerHTML = "";
+    return;
+  }
+  const map = new Map();
+  rows.forEach(x => { const d = x.r.date || ""; if (!map.has(d)) map.set(d, []); map.get(d).push(x); });
+  const dates = Array.from(map.keys()).sort().reverse();
+  let html = '<table class="rt"><thead><tr><th>时间</th><th>单</th><th>品项</th><th class="num">小计</th><th>收款</th><th>操作</th></tr></thead><tbody>';
+  dates.forEach(d => {
+    const list = map.get(d).slice().reverse();
+    const gsum = round2(list.reduce((a, x) => a + (+x.r.accessories || 0), 0));
+    html += '<tr class="grp"><td colspan="6">' + esc(d) + ' · ' + list.length + ' 笔 · 小计 ' + money(gsum) + '</td></tr>';
+    list.forEach(x => {
+      const r = x.r;
+      const who = r.kind === "retail" ? "配件零售" : pad2(r.seatNo || 0) + " 号工位";
+      const items = (r.items || []).map(it => esc(it.name) + " ×" + it.qty).join(" · ");
+      const pay = r.payType === "rmb" ? "人民币" : r.payType === "mixed" ? "混合" : r.payType === "card" ? "刷卡" : "现金";
+      const cls = r.payType === "rmb" ? "rmb" : r.payType === "mixed" ? "mixed" : (r.payType === "card" ? "card" : "cash");
+      const t = String(r.start || r.time || "").replace(/^\d{4}-\d{2}-\d{2}\s*/, "");
+      html += '<tr data-ridx="' + x.i + '">' +
+        '<td>' + esc(t) + '</td>' +
+        '<td>' + who + '</td>' +
+        '<td style="white-space:normal">' + items + '</td>' +
+        '<td class="num">' + money(r.accessories || 0) + '</td>' +
+        '<td><span class="chip ' + cls + '">' + pay + '</span></td>' +
+        '<td><button class="btn sm ghost" data-rdelrec="' + x.i + '">删除</button></td>' +
+        '</tr>';
+    });
+  });
+  html += "</tbody></table>";
+  wrap.innerHTML = html;
+}
+
+/* ---------- 购物车 ---------- */
+function rdAdd(id){
+  const it = itemOf(id); if (!it) return;
+  const stock = Math.max(0, Math.round(+it.stock || 0));
+  if (stock <= 0){ toast("这件已经售罄"); return; }
+  const cur = retailCart.find(x => x.id === id);
+  const q = cur ? cur.qty : 0;
+  if (q >= stock){ toast("库存只剩 " + stock + " 件"); return; }
+  if (cur) cur.qty++; else retailCart.push({id:id, qty:1});
+  renderRetailGrid(); renderRetailCart();
+}
+function rdStep(id, d){
+  const it = itemOf(id); const cur = retailCart.find(x => x.id === id);
+  if (!cur) return;
+  const q = cur.qty + d;
+  if (q <= 0){ retailCart = retailCart.filter(x => x.id !== id); }
+  else if (it && q > Math.max(0, Math.round(+it.stock || 0))){ toast("库存只剩 " + it.stock + " 件"); return; }
+  else cur.qty = q;
+  renderRetailGrid(); renderRetailCart();
+}
+function rdRemove(id){ retailCart = retailCart.filter(x => x.id !== id); renderRetailGrid(); renderRetailCart(); }
+
+/* 挂到工位：只登记，不扣库存；结算时统一扣 */
+function attachCartToSeat(){
+  if (!retailCart.length) return;
+  const seat = state.seats[rdSeatSel - 1];
+  if (!seat){ toast("先选一个工位"); return; }
+  const items = retailCart.map(c => { const it = itemOf(c.id); return it ? {id:it.id, name:it.name, price:it.price, qty:c.qty} : null; }).filter(Boolean);
+  if (!items.length) return;
+  if (!Array.isArray(seat.cart)) seat.cart = [];
+  items.forEach(x => {
+    const e = seat.cart.find(y => y.id === x.id);
+    if (e) e.qty += x.qty; else seat.cart.push(Object.assign({}, x));
+  });
+  retailCart = [];
+  touch();
+  renderRetail();
+  renderSeats();
+  toast("已挂到 " + pad2(seat.id) + " 号工位 · " + money(itemsSum(items)) + "，结算时自动带出");
+}
+
+/* ---------- 零售单结算 ---------- */
+function openRetailCheckout(){
+  if (!retailCart.length){ toast("先选配件"); return; }
+  const items = retailCart.map(c => { const it = itemOf(c.id); return it ? {id:it.id, name:it.name, price:it.price, qty:c.qty} : null; }).filter(Boolean);
+  if (!items.length) return;
+  const total = itemsSum(items);
+  const fx = +state.settings.fxRate || 0;
+  let pay = "card";
+  let dateVal = todayKey();
+  let rmbVal = round2(total * fx);
+  let delArmed = false;
+  const build = () => {
+    const fee = pay === "card" ? feeOf(total) : 0;
+    const due = round2(total + fee);
+    $("#mBody").innerHTML =
+      '<div class="rc-list">' + items.map(it =>
+        '<div class="rc-row"><span class="rc-n">' + esc(it.name) + '</span>' +
+        '<span class="rc-q">×' + it.qty + '</span>' +
+        '<span class="rc-a">' + money((+it.price || 0) * it.qty) + '</span></div>'
+      ).join("") + '</div>' +
+      '<div class="rc-total"><span>合计</span><b>' + money(due) + '</b>' +
+        (fee > 0.005 ? '<small>含刷卡手续费 ' + money(fee) + '</small>' : '') + '</div>' +
+      '<div class="field"><label>收款方式</label><div class="seg">' +
+        '<button class="segbtn' + (pay === "cash" ? " on" : "") + '" data-pay="cash">💵 现金</button>' +
+        '<button class="segbtn' + (pay === "card" ? " on" : "") + '" data-pay="card">💳 刷卡</button>' +
+        '<button class="segbtn' + (pay === "rmb" ? " on" : "") + '" data-pay="rmb">🇨🇳 人民币</button>' +
+      '</div></div>' +
+      (pay === "rmb" ? '<div class="field"><label>人民币实收 ¥</label><input class="input" id="rcRmb" type="number" min="0" step="0.01" value="' + rmbVal + '">' +
+        '<div class="hint">按汇率 ' + (fx || "—") + ' 折算，约 ¥' + round2(total * fx).toFixed(2) + '</div></div>' : '') +
+      '<div class="field"><label>日期</label><input class="input" id="rcDate" type="date" value="' + dateVal + '"></div>' +
+      '<div class="hint">确认后扣库存，并生成一条「配件零售」记录（不占工位）。</div>';
+    $("#mFoot").innerHTML = '<button class="btn" data-act="cancel">取消</button>' +
+      '<button class="btn acc" data-act="ok">确认收款 ' + money(due) + '</button>';
+  };
+  openModal("配件结算", build, e => {
+    const payBtn = e.target.closest("[data-pay]");
+    if (payBtn){
+      const d = document.getElementById("rcDate"), r = document.getElementById("rcRmb");
+      if (d) dateVal = d.value || dateVal;
+      if (r) rmbVal = parseFloat(r.value) || rmbVal;
+      pay = payBtn.dataset.pay; build(); return;
+    }
+    const act = e.target.closest("[data-act]"); if (!act) return;
+    if (act.dataset.act === "cancel"){ closeModal(); return; }
+    if (act.dataset.act !== "ok") return;
+    const dEl = document.getElementById("rcDate"), rEl = document.getElementById("rcRmb");
+    const date = (dEl && dEl.value) || todayKey();
+    if (pay === "rmb" && rEl) rmbVal = Math.max(0, parseFloat(rEl.value) || 0);
+    const fee = pay === "card" ? feeOf(total) : 0;
+    const due = round2(total + fee);
+    const part = {amount: total, payType: pay, fee: fee, due: due,
+      rmb: pay === "rmb" ? round2(rmbVal) : null,
+      rmbChannel: pay === "rmb" ? "wx" : "",
+      cashChannel: pay === "cash" ? "cash" : "",
+      label: "", dueOverride: null};
+    const rec = {
+      id: nextId(), kind: "retail", seatNo: 0, name: "配件零售", type: "", billing: "",
+      price: {}, startTs: 0, endTs: 0, date: date, realDate: date, start: "", end: "", hours: 0,
+      tableFee: 0, tableAll: 0, disc: 0, other: total, total: total,
+      fee: fee, grand: due, collected: due,
+      cashSum: pay === "cash" ? due : 0, cardSum: pay === "card" ? due : 0,
+      rmbSum: pay === "rmb" ? due : 0, rmbActual: pay === "rmb" ? round2(rmbVal) : 0,
+      perTable: 0, unpaid: 0, carryIn: 0, parts: [part], payType: pay,
+      memberId: "", memberName: "", balanceUsed: 0, memberUsed: 0,
+      mergedTable: "", mergedSum: 0,
+      time: new Date().toLocaleString("zh-CN"), range: "",
+      items: items, accessories: total
+    };
+    rec.payDetail = partsToText([part]);
+    rec.amount = rec.grand;
+    state.records.push(rec);
+    applyItemsStock(items, -1, "sale");
+    retailCart = [];
+    touch();
+    closeModal();
+    renderRetail();
+    toast("已收款 " + money(due) + "，已扣库存");
+  }, true);
+}
+
+/* ---------- 结算弹窗里的配件 ---------- */
+function renderAccPanel(){
+  const sumEl = document.getElementById("sAccSum");
+  const listEl = document.getElementById("sAccList");
+  if (!sumEl || !listEl) return;
+  sumEl.textContent = money(itemsSum(settleExtras));
+  listEl.innerHTML = settleExtras.length ? settleExtras.map(x =>
+    '<div class="acc-row"><span class="an">' + esc(x.name) + '</span>' +
+    '<span class="aq">×' + x.qty + '</span>' +
+    '<span class="ap">' + money((+x.price || 0) * x.qty) + '</span>' +
+    '<button type="button" class="ax" data-accrm="' + esc(x.id) + '" title="去掉">✕</button></div>'
+  ).join("") : '<div class="acc-empty">没加配件。点「＋ 加配件」从配件清单里选。</div>';
+}
+function openAccPickModal(){
+  const pick = settleExtras.map(x => ({id:x.id, qty:x.qty}));
+  const build = () => {
+    if (!state.items.length){
+      $("#mBody").innerHTML = '<div class="empty">还没有配件商品。先到「配件」页加商品，再回来挂到这里。</div>';
+      $("#mFoot").innerHTML = '<button class="btn" data-act="cancel">关闭</button>';
+      return;
+    }
+    const rows = state.items.slice().sort((a, b) => (+a.sort || 0) - (+b.sort || 0)).map(it => {
+      const p = pick.find(x => x.id === it.id);
+      const q = p ? p.qty : 0;
+      const stock = Math.max(0, Math.round(+it.stock || 0));
+      const sold = stock <= 0 && !q;
+      return '<div class="ap-row"><span class="ap-n">' + esc(it.name) + '<small>' + money(it.price) + ' · ' +
+        (stock <= 0 ? "售罄" : "库存 " + stock) + '</small></span>' +
+        (sold ? '<span class="xsmall muted">—</span>' :
+          '<span class="ap-q"><button data-act="pdec" data-id="' + esc(it.id) + '">−</button><b>' + q + '</b><button data-act="pinc" data-id="' + esc(it.id) + '">＋</button></span>') +
+        '</div>';
+    }).join("");
+    const sum = pick.reduce((a, p) => { const it = itemOf(p.id); return a + (it ? (+it.price || 0) * p.qty : 0); }, 0);
+    $("#mBody").innerHTML = '<div class="ap-list">' + rows + '</div>';
+    $("#mFoot").innerHTML = '<span class="grow small muted">合计 ' + money(sum) + '</span>' +
+      '<button class="btn" data-act="cancel">取消</button><button class="btn acc" data-act="ok">完成</button>';
+  };
+  openModal("加配件", build, e => {
+    const act = e.target.closest("[data-act]");
+    if (!act) return;
+    const a = act.dataset.act, id = act.dataset.id;
+    if (a === "cancel"){ closeModal(); return; }
+    if (a === "ok"){
+      settleExtras = pick.filter(p => p.qty > 0).map(p => { const it = itemOf(p.id); return {id:it.id, name:it.name, price:it.price, qty:p.qty}; });
+      closeModal();
+      renderAccPanel();
+      refreshSettle();
+      return;
+    }
+    const it = itemOf(id); if (!it) return;
+    let cur = pick.find(p => p.id === id);
+    if (!cur){ cur = {id:id, qty:0}; pick.push(cur); }
+    if (a === "pinc"){
+      if (cur.qty >= Math.max(0, Math.round(+it.stock || 0))){ toast("库存只剩 " + it.stock + " 件"); return; }
+      cur.qty++;
+    } else if (a === "pdec"){
+      cur.qty--;
+      if (cur.qty <= 0) pick.splice(pick.indexOf(cur), 1);
+    }
+    build();
+  }, true);
+}
+
+/* ---------- 商品 / 分类 / 盘点记录 ---------- */
+function openItemModal(item){
+  const isNew = !item;
+  const it = item ? Object.assign({}, item) : freshItem();
+  let catSel = it.cat || "";
+  let newCatOpen = false;
+  let delArm = false;
+  const build = () => {
+    const opts = '<option value="">未分类</option>' + state.cats.map(c =>
+      '<option value="' + esc(c.id) + '"' + (catSel === c.id ? " selected" : "") + '>' + esc(c.name) + '</option>').join("");
+    $("#mBody").innerHTML =
+      '<div class="field"><label>商品名</label><input class="input" id="itName" value="' + esc(it.name) + '" placeholder="比如：镊子 / 钥匙扣配件 / 单色豆 1000 粒"></div>' +
+      '<div class="field"><label>分类</label><div style="display:flex;gap:8px;align-items:center">' +
+        '<select class="input" id="itCat" style="flex:1">' + opts + '</select>' +
+        '<button class="btn sm" data-act="newcat">＋ 新分类</button></div>' +
+        (newCatOpen ? '<div style="display:flex;gap:6px;margin-top:8px"><input class="input" id="itNewCat" placeholder="新分类名，比如 工具"><button class="btn sm acc" data-act="addcat">添加</button></div>' : "") +
+      '</div>' +
+      '<div class="field"><label>单价 A$</label><input class="input" id="itPrice" type="number" min="0" step="0.5" value="' + (+it.price || 0) + '"></div>' +
+      '<div class="field"><label>库存</label><input class="input" id="itStock" type="number" min="0" step="1" value="' + (+it.stock || 0) + '"></div>' +
+      '<div class="field"><label>低库存提醒（剩几件提示）</label><input class="input" id="itLow" type="number" min="0" step="1" value="' + (+it.low != null ? +it.low : 3) + '"></div>' +
+      '<div class="field"><label>备注（可不填）</label><input class="input" id="itNote" value="' + esc(it.note || "") + '"></div>' +
+      (isNew ? "" : '<button class="btn" style="color:#b91c1c;border-color:#f3c6c0" data-act="del">' + (delArm ? "再点一次确认删除" : "删除这个商品") + '</button>');
+    $("#mFoot").innerHTML = '<button class="btn" data-act="cancel">取消</button>' +
+      '<button class="btn acc" data-act="save">' + (isNew ? "添加" : "保存") + '</button>';
+  };
+  openModal(isNew ? "新增商品" : "编辑商品", build, e => {
+    const act = e.target.closest("[data-act]"); if (!act) return;
+    const a = act.dataset.act;
+    const read = () => {
+      it.name = ($("#itName") ? $("#itName").value : "").trim();
+      it.cat = ($("#itCat") ? $("#itCat").value : "") || "";
+      it.price = round2(parseFloat($("#itPrice") ? $("#itPrice").value : 0) || 0);
+      it.stock = Math.max(0, Math.round(parseFloat($("#itStock") ? $("#itStock").value : 0) || 0));
+      it.low = Math.max(0, Math.round(parseFloat($("#itLow") ? $("#itLow").value : 0) || 0));
+      it.note = ($("#itNote") ? $("#itNote").value : "").trim();
+    };
+    if (a === "cancel"){ closeModal(); return; }
+    if (a === "newcat"){ read(); newCatOpen = !newCatOpen; build(); return; }
+    if (a === "addcat"){
+      const name = ($("#itNewCat") ? $("#itNewCat").value : "").trim();
+      if (!name){ toast("先写个分类名"); return; }
+      const c = {id:nextId(), name:name, emoji:"", sort:state.cats.length};
+      state.cats.push(c);
+      catSel = c.id; read(); it.cat = c.id; newCatOpen = false; build();
+      return;
+    }
+    if (a === "del"){
+      if (!delArm){ delArm = true; build(); return; }
+      state.items = state.items.filter(x => x.id !== it.id);
+      retailCart = retailCart.filter(x => x.id !== it.id);
+      touch(); closeModal(); renderRetail(); toast("商品已删除");
+      return;
+    }
+    if (a !== "save") return;
+    read();
+    if (!it.name){ toast("商品名不能空"); return; }
+    if (!(it.price > 0)){ toast("单价要大于 0"); return; }
+    if (isNew){
+      const targetStock = Math.max(0, Math.round(+it.stock || 0));
+      it.id = nextId();
+      it.sort = state.items.length;
+      it.stock = 0;
+      state.items.push(it);
+      if (targetStock > 0) stockAdd(it.id, targetStock, "new");
+      toast("已添加：" + it.name);
+    } else {
+      const old = itemOf(it.id);
+      const oldStock = old ? Math.max(0, Math.round(+old.stock || 0)) : 0;
+      const targetStock = Math.max(0, Math.round(+it.stock || 0));
+      it.stock = oldStock;                 // 先放回旧值，差额交给 stockAdd 记
+      Object.assign(old, it);
+      if (targetStock !== oldStock) stockAdd(it.id, targetStock - oldStock, "stocktake");
+      toast("已保存：" + it.name);
+    }
+    touch(); closeModal(); renderRetail();
+  }, true);
+}
+function openCatModal(){
+  let delArm = "";
+  const build = () => {
+    const rows = state.cats.map(c =>
+      '<div class="cat-row" data-cid="' + esc(c.id) + '">' +
+      '<input class="input" data-catname value="' + esc(c.name) + '">' +
+      '<button class="btn sm" data-act="rename" data-id="' + esc(c.id) + '">改名</button>' +
+      '<button class="btn sm" data-act="delcat" data-id="' + esc(c.id) + '"' + (delArm === c.id ? ' style="color:#b91c1c;border-color:#f3c6c0"' : '') + '>' +
+        (delArm === c.id ? "确认删？" : "删除") + '</button>' +
+      '</div>').join("");
+    $("#mBody").innerHTML =
+      '<div class="hint" style="margin-bottom:10px">分类随你分：工具 / 材料 / 成品，或者「钥匙扣」「豆子」都行。删分类不会删商品，商品会变成「未分类」。</div>' +
+      '<div class="cat-list">' + (rows || '<div class="empty">还没有分类。下面加一个。</div>') + '</div>' +
+      '<div style="display:flex;gap:6px;margin-top:10px"><input class="input" id="catNew" placeholder="新分类名，比如 工具"><button class="btn acc sm" data-act="add">添加</button></div>';
+    $("#mFoot").innerHTML = '<button class="btn" data-act="close">完成</button>';
+  };
+  openModal("管理分类", build, e => {
+    const act = e.target.closest("[data-act]"); if (!act) return;
+    const a = act.dataset.act, id = act.dataset.id;
+    if (a === "close"){ closeModal(); renderRetail(); return; }
+    if (a === "add"){
+      const name = ($("#catNew") ? $("#catNew").value : "").trim();
+      if (!name){ toast("先写个分类名"); return; }
+      state.cats.push({id:nextId(), name:name, emoji:"", sort:state.cats.length});
+      touch(); build(); renderRetail(); return;
+    }
+    if (a === "rename"){
+      const row = e.target.closest(".cat-row");
+      const inp = row ? row.querySelector("[data-catname]") : null;
+      const name = inp ? inp.value.trim() : "";
+      if (!name){ toast("分类名不能空"); return; }
+      const c = state.cats.find(x => x.id === id); if (!c) return;
+      c.name = name; touch(); build(); renderRetail(); return;
+    }
+    if (a === "delcat"){
+      if (delArm !== id){ delArm = id; build(); return; }
+      state.items.forEach(x => { if (x.cat === id) x.cat = ""; });
+      state.cats = state.cats.filter(x => x.id !== id);
+      if (retailCat === id) retailCat = "all";
+      delArm = ""; touch(); build(); renderRetail(); return;
+    }
+  }, true);
+}
+function openStockLogs(){
+  openModal("盘点 / 库存记录", () => {
+    const list = state.stockLogs.slice(0, 120);
+    const whyTxt = w => w === "sale" ? "出售" : w === "new" ? "新商品" : w === "stocktake" ? "盘点" :
+      w === "edit" ? "改单补差" : w === "delete" ? "删单归还" : "调整";
+    $("#mBody").innerHTML = list.length ? '<div class="log-list">' + list.map(l =>
+      '<div class="log-row"><span class="lt">' + esc(fmtDate(l.ts) + " " + fmtHM(l.ts)) + '</span>' +
+      '<span class="ln">' + esc(l.name) + '</span>' +
+      '<span class="ld ' + (l.delta > 0 ? "up" : "down") + '">' + (l.delta > 0 ? "+" : "") + l.delta + '</span>' +
+      '<span class="lw">' + whyTxt(l.why) + '</span></div>'
+    ).join("") + '</div>' : '<div class="empty">还没有库存变动。改库存、卖出去、盘点都会记一条。</div>';
+    $("#mFoot").innerHTML = '<button class="btn" data-act="close">关闭</button>';
+  }, e => { if (e.target.closest("[data-act]")) closeModal(); }, true);
+}
+
+/* ---------- 配件页事件 ---------- */
+$("#rdSearch").addEventListener("input", e => { retailQ = e.target.value; renderRetailGrid(); });
+$("#rdCats").addEventListener("click", e => {
+  const b = e.target.closest("[data-rcat]"); if (!b) return;
+  retailCat = b.dataset.rcat; renderRetail();
+});
+$("#rdCatAdd").addEventListener("click", openCatModal);
+$("#rdItemAdd").addEventListener("click", () => openItemModal(null));
+$("#rdEmptyAdd").addEventListener("click", () => openItemModal(null));
+$("#rdEditBtn").addEventListener("click", () => {
+  rdEditMode = !rdEditMode;
+  const b = $("#rdEditBtn");
+  b.textContent = rdEditMode ? "✓ 完成编辑" : "✎ 编辑商品";
+  b.classList.toggle("primary", rdEditMode);
+  renderRetailGrid();
+});
+$("#rdLogs").addEventListener("click", openStockLogs);
+$("#rdGrid").addEventListener("click", e => {
+  const add = e.target.closest("[data-radd]");
+  if (add){ rdAdd(add.dataset.radd); return; }
+  const inc = e.target.closest("[data-rinc]");
+  if (inc){ rdStep(inc.dataset.rinc, 1); return; }
+  const dec = e.target.closest("[data-rdec]");
+  if (dec){ rdStep(dec.dataset.rdec, -1); return; }
+  const ed = e.target.closest("[data-redit]");
+  if (ed){ const it = itemOf(ed.dataset.redit); if (it) openItemModal(it); return; }
+});
+$("#rdCart").addEventListener("click", e => {
+  const inc = e.target.closest("[data-rinc]");
+  if (inc){ rdStep(inc.dataset.rinc, 1); return; }
+  const dec = e.target.closest("[data-rdec]");
+  if (dec){ rdStep(dec.dataset.rdec, -1); return; }
+  const rm = e.target.closest("[data-rrm]");
+  if (rm){ rdRemove(rm.dataset.rrm); return; }
+  if (e.target.closest("#rdAttach")){ attachCartToSeat(); return; }
+  if (e.target.closest("#rdCheckout")){ openRetailCheckout(); return; }
+});
+$("#rdCart").addEventListener("change", e => {
+  if (e.target.id === "rdSeat") rdSeatSel = +e.target.value || 1;
+});
+$("#rdAttachBar").addEventListener("click", e => {
+  if (e.target.closest("[data-rgo]")) switchTab("board");
+});
+$("#rdRecords").addEventListener("click", e => {
+  const del = e.target.closest("[data-rdelrec]");
+  if (del){
+    const idx = +del.dataset.rdelrec;
+    const rec = state.records[idx];
+    if (!rec) return;
+    if (rdDelArm !== String(idx)){
+      rdDelArm = String(idx);
+      del.textContent = "再点一次";
+      clearTimeout(rdDelTimer);
+      rdDelTimer = setTimeout(() => {
+        rdDelArm = "";
+        const b = document.querySelector('[data-rdelrec="' + idx + '"]');
+        if (b) b.textContent = "删除";
+      }, 3000);
+      return;
+    }
+    rdDelArm = "";
+    applyItemsStock(rec.items || [], +1, "delete");
+    state.records.splice(idx, 1);
+    touch();
+    renderRetail();
+    toast("已删除记录，配件库存已还回");
+    return;
+  }
+  const tr = e.target.closest("tr[data-ridx]");
+  if (!tr) return;
+  const rec = state.records[+tr.dataset.ridx];
+  if (!rec) return;
+  if (rec.kind === "retail"){ toast("零售单不支持改单；要改就删掉重新卖一次"); return; }
+  openRecordEdit(+tr.dataset.ridx);
+});
+
+/* 结算弹窗里的配件块 */
+$("#sAccAdd").addEventListener("click", openAccPickModal);
+$("#sAccList").addEventListener("click", e => {
+  const b = e.target.closest("[data-accrm]"); if (!b) return;
+  settleExtras = settleExtras.filter(x => x.id !== b.dataset.accrm);
+  renderAccPanel();
+  refreshSettle();
+});
 
 /* 启动 */
 $("#verBtn").textContent = APP_VER;
