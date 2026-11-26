@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>拼豆店 · 工位看板</title>
-<meta name="app-ver" content="v0.3.1">
+<meta name="app-ver" content="v0.3.2">
 <style>
 :root{
   --bg:#f4efe6; --bg2:#fbf8f2; --card:#ffffff; --ink:#241f1a; --ink2:#4b4239; --muted:#7c7064;
@@ -148,6 +148,10 @@ aside{display:flex;flex-direction:column;gap:12px;position:sticky;top:12px}
 .cl-detail code{background:#f2ece2;border-radius:4px;padding:0 4px;font-size:11.5px;font-family:var(--mono)}
 .cl-more{font-size:12px;font-weight:700;color:var(--accent);text-decoration:none;margin-right:auto}
 .cl-more:hover{text-decoration:underline}
+.fx-info{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#faf6ef;border:1px solid var(--line);
+  border-radius:10px;padding:8px 10px;font-size:11px;color:var(--muted);margin-top:10px}
+.fx-info b{font-family:var(--mono);color:var(--ink)}
+.pay-tag.rmb{background:#fdf3dc;color:#8a6512}
 .mbox.wide{max-width:620px}
 
 /* modal */
@@ -306,7 +310,7 @@ body{
       <h1>
         <span class="beads"><i></i><i></i><i></i><i></i></span>
         拼豆店
-        <button class="ver" id="verBtn" title="更新日志">v0.3.1</button>
+        <button class="ver" id="verBtn" title="更新日志">v0.3.2</button>
       </h1>
       <div class="sub">
         <span>Zetland · 10 个工位 · 智能板 / 普通板 · 豆子不限量</span>
@@ -376,7 +380,7 @@ body{
 
 <footer class="foot">
   <span>拼豆店 · Zetland · 10 个工位</span>
-  <span>数据每 3 秒同步 · <b id="footVer">v0.3.1</b></span>
+  <span>数据每 3 秒同步 · <b id="footVer">v0.3.2</b></span>
 </footer>
 
 <div class="modal" id="modal">
@@ -405,14 +409,17 @@ const nowTime = () => { const d = new Date(); return [pad2(d.getHours()), pad2(d
 const todayKey = () => { const d = new Date(); return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()); };
 const TYPE = {smart:"智能板", normal:"普通板"};
 const BILL = {hourly:"按小时", package:"2 小时套餐"};
+const FX_API = "https://open.er-api.com/v6/latest/AUD";
+const round4 = n => Math.round((+n || 0) * 10000) / 10000;
 
 /* Firebase：新表放在同一个 RTDB 的 shops/<新 key> 下，和天胡门店数据隔离 */
 /* Firebase：独立项目 pindoushop 下的 shops/<key>/state；REST 轮询同步 */
 const FB_URL = "https://pindoushop-default-rtdb.asia-southeast1.firebasedatabase.app/shops/pindou-b7f9a52ba498/state.json";
 const FB_VER_URL = FB_URL.replace(/\/state\.json$/, "/__sysVer.json");
-const APP_VER = "v0.3.1", APP_DATE = "2026-11-24";
+const APP_VER = "v0.3.2", APP_DATE = "2026-11-24";
 // >>> APP_CHANGELOG BEGIN（自动生成，勿手改）
 const APP_CHANGELOG = [
+  { ver: "v0.3.2", date: "2026-11-24", sum: "新增人民币收款与实时汇率", items: ["新增 结算支持人民币收款，按设置汇率把澳币应收折算成人民币，记录中保存币种与汇率", "新增 设置页可实时拉取 AUD→CNY 市场价，按加点计算报价并保存更新时间", "调整 顶部价格摘要显示当前汇率，今日营收显示人民币小计", "测试 汇率接口、人民币结算与 Chrome 冒烟。"] },
   { ver: "v0.3.1", date: "2026-11-24", sum: "调整顶部与统计卡间距", items: ["调整 顶部卡片上边距从 20px 到 28px，移动端为 18px", "调整 顶部卡片与统计卡之间增加 22px 间距", "修复 顶部卡片与内容区左右未对齐", "测试 桌面与移动端截图检查。"] },
   { ver: "v0.3.0", date: "2026-11-24", sum: "整体界面视觉改版", items: ["调整 顶部栏、统计卡、工位卡、收款列表、弹窗统一为暖色手作风格", "新增 统计卡图标、工位板型价签、收款方式标签与页脚", "优化 运行中、暂停工位增加状态色条与悬停反馈", "测试 Chrome 冒烟、更新日志生成与移动端截图。"] },
   { ver: "v0.2.3", date: "2026-11-24", sum: "更新日志改为手风琴并统一规范", items: ["调整 更新日志唯一来源改为 README 的「最近 15 个版本」表格，由 `生成更新日志.py` 注入页面", "新增 弹窗默认收起，一行显示版本、日期、条数、摘要，点一行展开详情", "调整 详情按「新增、调整、修复、移除、优化、测试」开头，摘要不超过 28 字", "新增 发布体检校验页面内嵌日志与 README 是否同步。"] },
@@ -428,7 +435,8 @@ const DEFAULT_SETTINGS = {
   smartPackage: 28, normalPackage: 18,
   packageMinutes: 120,
   smartExtra: 3.75, normalExtra: 2.5,
-  cardFee: 1.2, memberDiscount: 10
+  cardFee: 1.2, memberDiscount: 10,
+  fxRate: 4.7, fxMarkup: 0.45, fxMarket: 0, fxUpdatedAt: "", fxFetchedAt: 0
 };
 function freshState(){
   return {
@@ -499,10 +507,42 @@ function billFor(seat, ms){
   return {minutes:Math.ceil(mins), amount:round2(p.package + extra), base:p.package, blocks, extra, detail:"含 " + p.packageMinutes + " 分钟" + (blocks ? " + 超时 " + blocks + "×15 分钟" : "")};
 }
 
+/* 人民币汇率：市场价 × (1 + 加点%) */
+function rmbOf(aud){
+  const fx = +state.settings.fxRate || 0;
+  return fx > 0 ? round2((+aud || 0) * fx) : null;
+}
+function fmtRmb(aud){
+  const r = rmbOf(aud);
+  return r == null ? "¥—" : "¥" + r.toFixed(2);
+}
+function fxInfoHTML(){
+  const s = state.settings;
+  return `市场价 ${s.fxMarket || "—"} · 报价 <b>${s.fxRate}</b> · 更新 ${s.fxUpdatedAt || "未更新"} <button class="btn sm" data-act="fx-refresh">实时</button>`;
+}
+async function fetchFxRate(verbose){
+  try {
+    const r = await fetch(FX_API + "?t=" + Date.now(), {cache:"no-store"});
+    const j = await r.json();
+    const market = j && j.rates && +j.rates.CNY;
+    if (!(market > 0)) throw new Error("no CNY rate");
+    state.settings.fxMarket = round4(market);
+    state.settings.fxRate = round4(market * (1 + (+state.settings.fxMarkup || 0) / 100));
+    state.settings.fxUpdatedAt = new Date().toLocaleString("zh-CN", {hour12:false});
+    state.settings.fxFetchedAt = Date.now();
+    touch();
+    if (verbose) toast("汇率已更新：1 AUD = " + state.settings.fxRate + " CNY");
+    return true;
+  } catch (e){
+    if (verbose) toast("汇率获取失败，继续用当前值");
+    return false;
+  }
+}
+
 /* 渲染 */
 function renderCfgSum(){
   const s = state.settings;
-  $("#cfgSumText").textContent = "智能 $" + s.smartHourly + "/h · 普通 $" + s.normalHourly + "/h · 套餐 $" + s.smartPackage + "/$" + s.normalPackage;
+  $("#cfgSumText").textContent = "智能 $" + s.smartHourly + "/h · 普通 $" + s.normalHourly + "/h · 套餐 $" + s.smartPackage + "/$" + s.normalPackage + " · 汇率 " + (+s.fxRate || "—");
 }
 function renderAll(){
   renderSeats();
@@ -548,8 +588,9 @@ function renderSummary(){
   const rows = state.records.filter(r => r.date === today);
   const rev = rows.reduce((a, r) => a + (+r.amount || 0), 0);
   const active = state.seats.filter(s => s.status !== "idle").length;
+  const cny = rows.reduce((a, r) => a + (+r.cny || 0), 0);
   $("#sumRev").textContent = money(rev);
-  $("#sumSub").textContent = "已收款";
+  $("#sumSub").textContent = "已收款" + (cny > 0 ? " · 人民币 ¥" + cny.toFixed(2) : "");
   $("#sumActive").textContent = active + " / 10";
   $("#sumActiveSub").textContent = "利用率 " + Math.round(active / 10 * 100) + "%";
   $("#sumOrders").textContent = rows.length;
@@ -560,7 +601,7 @@ function renderRecords(){
   const rows = state.records.filter(r => r.date === today).slice().reverse().slice(0, 8);
   $("#recCount").textContent = state.records.filter(r => r.date === today).length + " 笔";
   $("#records").innerHTML = rows.length ? rows.map(r =>
-    `<div class="rec-item"><span class="rec-l"><span class="rec-time">${r.time}</span><span class="rec-seat">${pad2(r.seatId)} 号</span><span class="rec-type">${TYPE[r.type] || ""}</span></span><span class="rec-r"><b>${money(r.amount)}</b><span class="pay-tag">${r.pay}</span></span></div>`
+    `<div class="rec-item"><span class="rec-l"><span class="rec-time">${r.time}</span><span class="rec-seat">${pad2(r.seatId)} 号</span><span class="rec-type">${TYPE[r.type] || ""}</span></span><span class="rec-r"><b>${money(r.amount)}</b><span class="pay-tag ${r.cny ? "rmb" : ""}">${r.cny ? "人民币 ¥" + r.cny.toFixed(2) : r.pay}</span></span></div>`
   ).join("") : `<div class="empty">今天还没有收款。</div>`;
 }
 
@@ -664,12 +705,14 @@ $("#seats").addEventListener("click", e => {
 function openSettle(seat, ms){
   const b = billFor(seat, ms);
   const draft = {member:false, pay:"cash"};
+  const fx0 = +state.settings.fxRate || 0;
   const build = () => {
     const st = state.settings;
     const disc = draft.member ? round2(b.amount * (+st.memberDiscount || 0) / 100) : 0;
     const sub = round2(b.amount - disc);
     const fee = draft.pay === "card" ? Math.ceil(sub * (+st.cardFee || 0) / 100 * 100) / 100 : 0;
     const total = round2(sub + fee);
+    const rmb = draft.pay === "rmb" && fx0 > 0 ? round2(sub * fx0) : null;
     $("#mBody").innerHTML = `
       <div class="receipt">
         <div class="rr"><span>工位</span><span>${pad2(seat.id)} 号 · ${TYPE[seat.type]}</span></div>
@@ -677,18 +720,22 @@ function openSettle(seat, ms){
         <div class="rr"><span>${BILL[seat.billing]} · ${b.detail}</span><span>${money(b.amount)}</span></div>
         ${disc ? `<div class="rr"><span>会员 ${st.memberDiscount}% 优惠</span><span>−${money(disc)}</span></div>` : ""}
         ${fee ? `<div class="rr"><span>刷卡手续费 ${st.cardFee}%</span><span>${money(fee)}</span></div>` : ""}
-        <div class="rr tot"><span>应收</span><span>${money(total)}</span></div>
+        ${rmb != null ? `<div class="rr"><span>汇率</span><span>1 AUD = ${fx0} CNY</span></div>
+        <div class="rr"><span>人民币应收</span><span>¥${rmb.toFixed(2)}</span></div>` : ""}
+        <div class="rr tot"><span>应收</span><span>${rmb != null ? "¥" + rmb.toFixed(2) : money(total)}</span></div>
+        ${rmb != null ? `<div class="rr" style="color:#9a8c7d;font-size:10.5px"><span>折合</span><span>${money(sub)}</span></div>` : ""}
       </div>
       <label class="checkline" style="margin-top:11px"><input type="checkbox" id="memChk" ${draft.member ? "checked" : ""}> 会员 ${state.settings.memberDiscount}% 优惠</label>
       <div class="field" style="margin:9px 0 0"><label>怎么收</label>
         <div class="payopts">
           <button class="payopt ${draft.pay === "cash" ? "on" : ""}" data-pay="cash">💵 现金</button>
           <button class="payopt ${draft.pay === "card" ? "on" : ""}" data-pay="card">💳 刷卡 +${state.settings.cardFee}%</button>
+          <button class="payopt ${draft.pay === "rmb" ? "on" : ""}" data-pay="rmb" ${fx0 > 0 ? "" : "disabled"}>人民币</button>
         </div>
       </div>
-      <div class="xsmall muted" style="margin-top:9px">收款后本单完成；板子和豆子不单独收费。</div>`;
+      <div class="xsmall muted" style="margin-top:9px">收款后本单完成；板子和豆子不单独收费。${fx0 > 0 ? " 汇率由设置里的实时价 × 加点计算。" : ""}</div>`;
     $("#mFoot").innerHTML = `<button class="btn" data-act="cancel">取消</button>
-      <button class="btn acc" data-act="ok">收款 ${money(total)}</button>`;
+      <button class="btn acc" data-act="ok">收款 ${rmb != null ? "¥" + rmb.toFixed(2) : money(total)}</button>`;
   };
   openModal(`结算 · ${pad2(seat.id)} 号工位`, build, e => {
     if (e.target.id === "memChk"){ draft.member = e.target.checked; build(); return; }
@@ -703,10 +750,11 @@ function openSettle(seat, ms){
       const sub = round2(b.amount - disc);
       const fee = draft.pay === "card" ? Math.ceil(sub * (+st.cardFee || 0) / 100 * 100) / 100 : 0;
       const total = round2(sub + fee);
-      const payLabel = draft.pay === "card" ? "刷卡" : "现金";
-      state.records.push({id:nextId(), seatId:seat.id, type:seat.type, amount:total, pay:payLabel, minutes:b.minutes, time:nowTime(), date:todayKey()});
+      const rmb = draft.pay === "rmb" && fx0 > 0 ? round2(sub * fx0) : null;
+      const payLabel = draft.pay === "rmb" ? "人民币" : draft.pay === "card" ? "刷卡" : "现金";
+      state.records.push({id:nextId(), seatId:seat.id, type:seat.type, amount:total, cny:rmb, fx:rmb != null ? fx0 : null, pay:payLabel, minutes:b.minutes, time:nowTime(), date:todayKey()});
       Object.assign(seat, {status:"idle", type:null, billing:null, startAt:0, accMs:0, price:null, last:{amount:total, time:nowTime()}});
-      touch(); closeModal(); toast(`${pad2(seat.id)} 号收款 ${money(total)}，本单完成`);
+      touch(); closeModal(); toast(`${pad2(seat.id)} 号收款 ${rmb != null ? "¥" + rmb.toFixed(2) : money(total)}，本单完成`);
     }
   });
 }
@@ -819,24 +867,43 @@ function openSettings(){
         <div class="field"><label>智能板超时 / 15 分钟</label><input class="input" id="setSmartExtra" type="number" min="0" step="0.25" value="${s.smartExtra}"></div>
         <div class="field"><label>普通板超时 / 15 分钟</label><input class="input" id="setNormalExtra" type="number" min="0" step="0.25" value="${s.normalExtra}"></div>
         <div class="field"><label>会员优惠 %</label><input class="input" id="setMemberDiscount" type="number" min="0" max="50" step="1" value="${s.memberDiscount}"></div>
+        <div class="field"><label>人民币汇率 (1 AUD = ? CNY)</label><input class="input" id="setFxRate" type="number" min="0" step="0.0001" value="${s.fxRate}"></div>
+        <div class="field"><label>汇率加点 %</label><input class="input" id="setFxMarkup" type="number" min="0" step="0.01" value="${s.fxMarkup}"></div>
       </div>
-      <div class="xsmall muted" style="margin-top:10px">价格只影响新开的工单；进行中的按开台时锁定的价格结算。</div>`;
+      <div class="fx-info" id="fxInfo">${fxInfoHTML()}</div>
+      <div class="xsmall muted" style="margin-top:10px">价格只影响新开的工单；进行中的按开台时锁定的价格结算。人民币金额 = 澳币应收 × 汇率。</div>`;
     $("#mFoot").innerHTML = `<button class="btn" data-act="cancel">取消</button><button class="btn acc" data-act="save">保存</button>`;
   };
   openModal("设置 · 价格", build, e => {
     const act = e.target.closest("[data-act]"); if (!act) return;
     if (act.dataset.act === "cancel"){ closeModal(); return; }
+    if (act.dataset.act === "fx-refresh"){
+      act.disabled = true; act.textContent = "获取中…";
+      fetchFxRate(true).then(ok => {
+        if (ok && $("#fxInfo")){
+          $("#fxInfo").innerHTML = fxInfoHTML();
+          if ($("#setFxRate")) $("#setFxRate").value = state.settings.fxRate;
+        }
+        if (act){ act.disabled = false; act.textContent = "实时"; }
+      });
+      return;
+    }
     if (act.dataset.act === "save"){
       const val = id => Math.max(0, parseFloat($(id).value) || 0);
+      const old = state.settings;
+      const newFx = val("#setFxRate") || old.fxRate;
       state.settings = {
         smartHourly:val("#setSmartHourly"), normalHourly:val("#setNormalHourly"),
         smartPackage:val("#setSmartPackage"), normalPackage:val("#setNormalPackage"),
         packageMinutes:Math.max(30, val("#setPackageMinutes")),
         cardFee:val("#setCardFee"),
         smartExtra:val("#setSmartExtra"), normalExtra:val("#setNormalExtra"),
-        memberDiscount:Math.min(50, val("#setMemberDiscount"))
+        memberDiscount:Math.min(50, val("#setMemberDiscount")),
+        fxRate:newFx, fxMarkup:val("#setFxMarkup"),
+        fxMarket:old.fxMarket, fxUpdatedAt:newFx !== old.fxRate ? "手动" : old.fxUpdatedAt,
+        fxFetchedAt:old.fxFetchedAt
       };
-      touch(); closeModal(); toast("价格已保存");
+      touch(); closeModal(); toast("设置已保存");
     }
   });
 }
@@ -896,6 +963,16 @@ renderAll();
 tick();
 setInterval(tick, 1000);
 initFB();
+setTimeout(() => {
+  const s = state.settings;
+  if (!document.querySelector("#modal").classList.contains("on") &&
+      (!s.fxFetchedAt || Date.now() - s.fxFetchedAt > 6 * 3600 * 1000)) fetchFxRate(false);
+}, 2200);
+setInterval(() => {
+  const s = state.settings;
+  if (!document.querySelector("#modal").classList.contains("on") &&
+      (!s.fxFetchedAt || Date.now() - s.fxFetchedAt > 6 * 3600 * 1000)) fetchFxRate(false);
+}, 30 * 60 * 1000);
 })();
 </script>
 </body>
