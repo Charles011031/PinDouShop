@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>拼豆店 · 工位看板</title>
-<meta name="app-ver" content="v0.7.1">
+<meta name="app-ver" content="v0.7.2">
 <style>
 :root{
   --bg:#f4efe6; --bg2:#fbf8f2; --card:#ffffff; --ink:#241f1a; --ink2:#4b4239; --muted:#7c7064;
@@ -556,12 +556,12 @@ table.rt select.mini-sel{padding:4px 6px;font-size:11px;border-radius:8px;backgr
 .rd-layout{display:grid;grid-template-columns:1fr 316px;gap:14px;align-items:start}
 .rd-main{min-width:0}
 .rd-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-.pcard{position:relative;background:var(--card);border:1px solid #eadfd1;border-radius:14px;padding:11px 11px 10px;display:flex;flex-direction:column;gap:6px;transition:.13s;box-shadow:0 1px 2px rgba(50,35,20,.03);min-height:120px;overflow:hidden}
+.pcard{position:relative;background:var(--card);border:1px solid #eadfd1;border-radius:14px;padding:11px 11px 10px;display:flex;flex-direction:column;gap:6px;transition:.13s;box-shadow:0 1px 2px rgba(50,35,20,.03);min-height:0;overflow:hidden}
 .pcard:hover{transform:translateY(-2px);border-color:#d9c6ad;box-shadow:0 10px 22px rgba(50,35,20,.08)}
 .pcard.soldout{opacity:.58;background:#faf6f0}
 .pcard.soldout:hover{transform:none;box-shadow:none;border-color:#eadfd1}
 .pcard .pico{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:#f8f0e4;font-size:17px;line-height:1;flex:none}
-.pcard .pname{font-size:12.5px;font-weight:800;line-height:1.35;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;min-height:34px}
+.pcard .pname{font-size:12.5px;font-weight:800;line-height:1.35;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .pcard .pfoot{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:auto}
 .pcard .pfoot b{font-family:var(--mono);font-size:13px}
 .pcard .pstock{font-size:10px;color:var(--muted);white-space:nowrap}
@@ -574,6 +574,8 @@ table.rt select.mini-sel{padding:4px 6px;font-size:11px;border-radius:8px;backgr
 .pcard .stepper button:hover{background:rgba(255,255,255,.18)}
 .pcard .stepper b{min-width:16px;text-align:center;font-size:11.5px;font-family:var(--mono);color:#fff}
 .pcard .sold-tag{position:absolute;top:9px;left:9px;font-size:9.5px;font-weight:800;color:#fff;background:var(--bad);border-radius:5px;padding:2px 5px}
+.pcard.editing{cursor:pointer}
+.pcard.editing:hover{border-color:#e0b48a;background:#fffdf8}
 .pcard .pedit{position:absolute;right:9px;top:9px;width:24px;height:24px;border:1px solid var(--line);border-radius:8px;background:#fffdf8;color:var(--ink2);display:grid;place-items:center;font-size:12px;padding:0}
 .pcard .pedit:hover{border-color:#d9c6ad;background:#fff}
 .pico.ph{padding:0;overflow:hidden}
@@ -679,7 +681,7 @@ table.rt select.mini-sel{padding:4px 6px;font-size:11px;border-radius:8px;backgr
       <h1>
         <span class="beads"><i></i><i></i><i></i><i></i></span>
         拼豆店
-        <button class="ver" id="verBtn" title="更新日志">v0.7.1</button>
+        <button class="ver" id="verBtn" title="更新日志">v0.7.2</button>
       </h1>
       <div class="sub">
         <span>Zetland · 10 个工位 · 智能板 / 普通板 · 豆子不限量</span>
@@ -881,7 +883,7 @@ table.rt select.mini-sel{padding:4px 6px;font-size:11px;border-radius:8px;backgr
 
 <footer class="foot">
   <span>拼豆店 · Zetland · 10 个工位</span>
-  <span>数据每 3 秒同步 · <b id="footVer">v0.7.1</b></span>
+  <span>数据每 3 秒同步 · <b id="footVer">v0.7.2</b></span>
 </footer>
 
 <div class="modal" id="modal">
@@ -1024,9 +1026,10 @@ const round4 = n => Math.round((+n || 0) * 10000) / 10000;
 /* Firebase：独立项目 pindoushop 下的 shops/<key>/state；REST 轮询同步 */
 const FB_URL = "https://pindoushop-default-rtdb.asia-southeast1.firebasedatabase.app/shops/pindou-b7f9a52ba498/state.json";
 const FB_VER_URL = FB_URL.replace(/\/state\.json$/, "/__sysVer.json");
-const APP_VER = "v0.7.1", APP_DATE = "2026-11-27";
+const APP_VER = "v0.7.2", APP_DATE = "2026-11-27";
 // >>> APP_CHANGELOG BEGIN（自动生成，勿手改）
 const APP_CHANGELOG = [
+  { ver: "v0.7.2", date: "2026-11-27", sum: "配件卡收紧，编辑模式整张卡可点", items: ["调整 配件卡去掉多余留白，高度跟随内容，名称不再固定预留两行，价格与库存贴底对齐", "调整 编辑模式下整张卡片都能点开编辑（原来只能点右上角铅笔），并加了悬停反馈", "测试 配件冒烟 47 项、结算冒烟 27 项、页面冒烟 79 项共 153 项全绿。"] },
   { ver: "v0.7.1", date: "2026-11-27", sum: "配件可以放照片，自己裁成小图", items: ["新增 商品照片，选图后拖动位置、滑杆或滚轮缩放，存成 200×200 JPEG 小图，卡片上直接显示", "新增 照片存进商品里，多设备同步，数据没变时用 ETag 跳过下载，加了照片也不费流量", "调整 选完照片不会清掉已经填好的名称 / 价格 / 库存（先读回再重绘）", "测试 配件冒烟 47 项、结算冒烟 27 项、页面冒烟 79 项共 153 项全绿。"] },
   { ver: "v0.7.0", date: "2026-11-27", sum: "新增配件页，可挂工位也可单独卖", items: ["新增 顶部第四个页签「配件」，商品和分类都自己加，点卡片加购、库存售罄拦截、盘点记录", "新增 结算弹窗里「＋ 加配件」，工位上挂着的配件自动带出，和其它费用一起进账单", "新增 单独结算走「配件零售」单，不占工位，支持现金 / 刷卡 / 人民币", "调整 配件库存只在落单时扣，结算扣、改单按差额补、删单归还，挂账期间不扣", "调整 统计「其它费用」里拆出「其中配件」，结算记录与今日收款认零售单", "测试 新增配件冒烟 41 项，连同结算 27 项、页面 79 项共 147 项全绿。"] },
   { ver: "v0.6.6", date: "2026-11-27", sum: "工位卡不再逐个显示价格", items: ["调整 空工位的「智能板 / 普通板」按钮去掉单价，只留板型名，价格统一看顶部价格摘要", "调整 两个按钮改成单行居中、稍高一点，去掉为放价格留的竖排布局", "移除 不再使用的 `priceLabel()` 函数", "测试 结算冒烟 27 项与页面冒烟 77 项回归通过。"] },
@@ -1041,7 +1044,6 @@ const APP_CHANGELOG = [
   { ver: "v0.4.0", date: "2026-11-27", sum: "结账改为天胡式收款明细与挂账补收", items: ["新增 结算弹窗改为收款明细逐笔记账，可按笔选现金、刷卡、人民币并拆成混合支付，刷卡可填实收自动反推本金", "新增 少收的钱可选记在工位上或直接免除，工位卡出现补收入口，补收只收欠款不再叠加台费", "调整 结算记录存 `parts` 明细与起止时间字段，今日收款可点开原地修改或删除，旧记录自动迁移", "测试 真 Chrome 跑通开台、结算、编辑、撤销结束、挂账补收 25 项断言，发布体检含日志一致性。"] },
   { ver: "v0.3.2", date: "2026-11-24", sum: "新增人民币收款与实时汇率", items: ["新增 结算支持人民币收款，按设置汇率把澳币应收折算成人民币，记录中保存币种与汇率", "新增 设置页可实时拉取 AUD→CNY 市场价，按加点计算报价并保存更新时间", "调整 顶部价格摘要显示当前汇率，今日营收显示人民币小计", "测试 汇率接口、人民币结算与 Chrome 冒烟。"] },
   { ver: "v0.3.1", date: "2026-11-24", sum: "调整顶部与统计卡间距", items: ["调整 顶部卡片上边距从 20px 到 28px，移动端为 18px", "调整 顶部卡片与统计卡之间增加 22px 间距", "修复 顶部卡片与内容区左右未对齐", "测试 桌面与移动端截图检查。"] },
-  { ver: "v0.3.0", date: "2026-11-24", sum: "整体界面视觉改版", items: ["调整 顶部栏、统计卡、工位卡、收款列表、弹窗统一为暖色手作风格", "新增 统计卡图标、工位板型价签、收款方式标签与页脚", "优化 运行中、暂停工位增加状态色条与悬停反馈", "测试 Chrome 冒烟、更新日志生成与移动端截图。"] },
 ];
 // <<< APP_CHANGELOG END（自动生成，勿手改）
 
@@ -3720,7 +3722,7 @@ function itemCardHtml(it){
   } else {
     corner = '<button class="padd" data-radd="' + esc(it.id) + '" title="加一件">＋</button>';
   }
-  return '<div class="pcard' + (q > 0 && !rdEditMode ? " on" : "") + (sold ? " soldout" : "") + '" data-rid="' + esc(it.id) + '">' +
+  return '<div class="pcard' + (q > 0 && !rdEditMode ? " on" : "") + (sold ? " soldout" : "") + (rdEditMode ? " editing" : "") + '" data-rid="' + esc(it.id) + '">' +
     '<div class="pico' + (it.photo ? " ph" : "") + '">' + (it.photo ? '<img src="' + esc(it.photo) + '" alt="">' : esc(catEmoji(it.cat))) + '</div>' +
     '<div class="pname" title="' + esc(it.name) + '">' + esc(it.name) + '</div>' +
     '<div class="pfoot"><b>' + money(it.price) + '</b><span class="pstock ' + (sold ? "out" : low ? "low" : "") + '">' +
@@ -4286,6 +4288,10 @@ $("#rdGrid").addEventListener("click", e => {
   if (dec){ rdStep(dec.dataset.rdec, -1); return; }
   const ed = e.target.closest("[data-redit]");
   if (ed){ const it = itemOf(ed.dataset.redit); if (it) openItemModal(it); return; }
+  if (rdEditMode){
+    const card = e.target.closest(".pcard[data-rid]");
+    if (card){ const it = itemOf(card.dataset.rid); if (it) openItemModal(it); }
+  }
 });
 $("#rdCart").addEventListener("click", e => {
   const inc = e.target.closest("[data-rinc]");
